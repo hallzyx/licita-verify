@@ -67,7 +67,10 @@ export const licitacionSchema = z.object({
   fechaApertura: z
     .string()
     .min(1, "La fecha de apertura es obligatoria"),
-  presupuestoOficial: z.coerce.number().positive("Debe ser un monto positivo").optional(),
+  presupuestoOficial: z.preprocess(
+    (v) => (v === "" || v === undefined || v === null ? undefined : Number(v)),
+    z.number().positive("Debe ser un monto positivo").optional(),
+  ),
   criterioAdjudicacion: z.string().max(500).optional(),
   estado: z.enum(ESTADOS, {
     message: "Seleccioná un estado",
