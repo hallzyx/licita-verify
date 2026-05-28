@@ -76,6 +76,9 @@ export const licitacionSchema = z.object({
     message: "Seleccioná un estado",
   }),
   fuenteUrl: z.string().url("Debe ser una URL válida").optional().or(z.literal("")),
+  // Passthrough fields (not validated, just passed through for Arkiv payload)
+  documentHash: z.string().optional(),
+  documentName: z.string().optional(),
 }).refine(
   (data) => {
     if (!data.fechaConvocatoria || !data.fechaApertura) return true;
