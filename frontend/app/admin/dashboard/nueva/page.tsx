@@ -298,6 +298,7 @@ export default function NuevaLicitacionPage() {
 
             <FileUpload
               label="Pliego / Documento (PDF, JPG o PNG, máx. 10 MB)"
+              value={fileUpload}
               onChange={setFileUpload}
             />
 

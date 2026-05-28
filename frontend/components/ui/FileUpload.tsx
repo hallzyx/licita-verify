@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { computeSha256 } from "@/lib/hash";
 
 export interface FileUploadResult {
@@ -12,17 +12,28 @@ export interface FileUploadResult {
 interface FileUploadProps {
   label?: string;
   error?: string;
+  value?: FileUploadResult;
   onChange?: (result: FileUploadResult) => void;
 }
 
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
-export function FileUpload({ label, error, onChange }: FileUploadProps) {
+export function FileUpload({ label, error, value, onChange }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [fileHash, setFileHash] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+
+  // Sync external value (e.g. from AI extraction) into internal display state
+  useEffect(() => {
+    if (value?.file && value.fileName) {
+      setSelectedFile(value.file);
+      setFileName(value.fileName);
+      setFileHash(value.hash);
+      setLocalError(null);
+    }
+  }, [value?.file, value?.fileName, value?.hash]);
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
