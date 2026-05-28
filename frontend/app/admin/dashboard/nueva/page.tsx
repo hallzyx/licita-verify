@@ -14,8 +14,8 @@ import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/ui/FileUpload";
 import type { FileUploadResult } from "@/components/ui/FileUpload";
 import { ConfidenceBadge } from "@/components/ui/ConfidenceBadge";
-import { AiExtractModal } from "@/components/AiExtractModal";
-import type { AiFieldResult } from "@/lib/ai";
+import { AiExtractModal, type AiExtractResult } from "@/components/AiExtractModal";
+
 
 export default function NuevaLicitacionPage() {
   const router = useRouter();
@@ -77,9 +77,10 @@ export default function NuevaLicitacionPage() {
     fuenteUrl: "fuenteUrl",
   };
 
-  function handleAiComplete(fields: Record<string, AiFieldResult>) {
+  function handleAiComplete(result: AiExtractResult) {
+    // Pre-fill form fields
     const mapped: Record<string, "alta" | "media" | "baja"> = {};
-    for (const [key, field] of Object.entries(fields)) {
+    for (const [key, field] of Object.entries(result.fields)) {
       const formKey = AI_FIELD_MAP[key];
       if (formKey && field.value !== null && field.value !== undefined && field.value !== "") {
         setValue(formKey, field.value as LicitacionFormValues[keyof LicitacionFormValues], {
@@ -89,6 +90,14 @@ export default function NuevaLicitacionPage() {
       }
     }
     setAiFields(mapped);
+
+    // Also fill the FileUpload slot with the scanned document
+    setFileUpload({
+      file: result.file,
+      hash: result.hash,
+      fileName: result.fileName,
+    });
+
     setShowModal(false);
   }
 
@@ -177,8 +186,6 @@ export default function NuevaLicitacionPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={!fileUpload.file}
-              title={!fileUpload.file ? "Seleccioná un archivo primero" : undefined}
               onClick={() => setShowModal(true)}
             >
               🤖 Auto-llenado IA
@@ -335,9 +342,8 @@ export default function NuevaLicitacionPage() {
       </main>
 
       {/* ── AI Extraction Modal ─────────────────────────────────── */}
-      {showModal && fileUpload.file && (
+      {showModal && (
         <AiExtractModal
-          file={fileUpload.file}
           onComplete={handleAiComplete}
           onClose={() => setShowModal(false)}
         />
