@@ -13,6 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/ui/FileUpload";
 import type { FileUploadResult } from "@/components/ui/FileUpload";
+import { ConfidenceBadge } from "@/components/ui/ConfidenceBadge";
+import { AiExtractModal } from "@/components/AiExtractModal";
+import type { AiFieldResult } from "@/lib/ai";
 
 export default function NuevaLicitacionPage() {
   const router = useRouter();
@@ -27,6 +30,8 @@ export default function NuevaLicitacionPage() {
     entityKey: string;
     txHash: string;
   } | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [aiFields, setAiFields] = useState<Record<string, "alta" | "media" | "baja"> | null>(null);
 
   // @hookform/resolvers v5 + Zod v4 have a known type incompatibility.
   // The cast bridges the schema inference gap.
@@ -35,6 +40,7 @@ export default function NuevaLicitacionPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LicitacionFormValues>({
     resolver: typedResolver,
@@ -53,6 +59,40 @@ export default function NuevaLicitacionPage() {
       fuenteUrl: "",
     },
   });
+
+  // ── AI field mapping ──────────────────────────────────────────────────
+
+  const AI_FIELD_MAP: Record<string, keyof LicitacionFormValues> = {
+    expediente: "expediente",
+    organismo: "organismo",
+    jurisdiccion: "jurisdiccion",
+    tipoProcedimiento: "tipoProcedimiento",
+    rubro: "rubro",
+    objeto: "objeto",
+    fechaConvocatoria: "fechaConvocatoria",
+    fechaApertura: "fechaApertura",
+    presupuestoOficial: "presupuestoOficial",
+    criterioAdjudicacion: "criterioAdjudicacion",
+    estado: "estado",
+    fuenteUrl: "fuenteUrl",
+  };
+
+  function handleAiComplete(fields: Record<string, AiFieldResult>) {
+    const mapped: Record<string, "alta" | "media" | "baja"> = {};
+    for (const [key, field] of Object.entries(fields)) {
+      const formKey = AI_FIELD_MAP[key];
+      if (formKey && field.value !== null && field.value !== undefined && field.value !== "") {
+        setValue(formKey, field.value as LicitacionFormValues[keyof LicitacionFormValues], {
+          shouldValidate: true,
+        });
+        mapped[key] = field.confidence;
+      }
+    }
+    setAiFields(mapped);
+    setShowModal(false);
+  }
+
+  // ── Submit ─────────────────────────────────────────────────────────────
 
   async function onSubmit(data: LicitacionFormValues) {
     setIsSubmitting(true);
@@ -96,6 +136,26 @@ export default function NuevaLicitacionPage() {
     }
   }, [success, router]);
 
+  // ── Helpers ────────────────────────────────────────────────────────────
+
+  function renderLabelWithBadge(
+    htmlFor: string,
+    label: string,
+    fieldKey: string,
+  ) {
+    const confidence = aiFields?.[fieldKey] as "alta" | "media" | "baja" | undefined;
+    return (
+      <div className="flex items-center gap-2">
+        <label htmlFor={htmlFor} className="text-sm font-medium text-gray-700">
+          {label}
+        </label>
+        {confidence && <ConfidenceBadge confidence={confidence} />}
+      </div>
+    );
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-white">
@@ -111,74 +171,117 @@ export default function NuevaLicitacionPage() {
           </Button>
         </div>
 
-        <Card title="Nueva licitación">
+        <Card
+          title="Nueva licitación"
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!fileUpload.file}
+              title={!fileUpload.file ? "Seleccioná un archivo primero" : undefined}
+              onClick={() => setShowModal(true)}
+            >
+              🤖 Auto-llenado IA
+            </Button>
+          }
+        >
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-            <Input
-              label="Número de expediente"
-              placeholder="Ej: EX-2024-001"
-              error={errors.expediente?.message}
-              {...register("expediente")}
-            />
+            {/* ── Fields with AI badge support ──────────────────── */}
 
-            <Input
-              label="Organismo contratante"
-              placeholder="Ej: Ministerio de Obras Públicas"
-              error={errors.organismo?.message}
-              {...register("organismo")}
-            />
+            <div className="flex flex-col gap-1">
+              {renderLabelWithBadge("expediente", "Número de expediente", "expediente")}
+              <Input
+                id="expediente"
+                placeholder="Ej: EX-2024-001"
+                error={errors.expediente?.message}
+                {...register("expediente")}
+              />
+            </div>
 
-            <Input
-              label="Jurisdicción"
-              placeholder="Ej: Nacional"
-              error={errors.jurisdiccion?.message}
-              {...register("jurisdiccion")}
-            />
+            <div className="flex flex-col gap-1">
+              {renderLabelWithBadge("organismo", "Organismo contratante", "organismo")}
+              <Input
+                id="organismo"
+                placeholder="Ej: Ministerio de Obras Públicas"
+                error={errors.organismo?.message}
+                {...register("organismo")}
+              />
+            </div>
 
-            <Select
-              label="Tipo de procedimiento"
-              placeholder="Seleccioná un tipo"
-              options={TIPOS_PROCEDIMIENTO.map((t) => ({ value: t, label: t }))}
-              error={errors.tipoProcedimiento?.message}
-              {...register("tipoProcedimiento")}
-            />
+            <div className="flex flex-col gap-1">
+              {renderLabelWithBadge("jurisdiccion", "Jurisdicción", "jurisdiccion")}
+              <Input
+                id="jurisdiccion"
+                placeholder="Ej: Nacional"
+                error={errors.jurisdiccion?.message}
+                {...register("jurisdiccion")}
+              />
+            </div>
 
-            <Select
-              label="Rubro"
-              placeholder="Seleccioná un rubro"
-              options={RUBROS.map((r) => ({ value: r, label: r }))}
-              error={errors.rubro?.message}
-              {...register("rubro")}
-            />
+            <div className="flex flex-col gap-1">
+              {renderLabelWithBadge("tipo-procedimiento", "Tipo de procedimiento", "tipoProcedimiento")}
+              <Select
+                id="tipo-procedimiento"
+                placeholder="Seleccioná un tipo"
+                options={TIPOS_PROCEDIMIENTO.map((t) => ({ value: t, label: t }))}
+                error={errors.tipoProcedimiento?.message}
+                {...register("tipoProcedimiento")}
+              />
+            </div>
 
-            <Textarea
-              label="Objeto de contratación"
-              placeholder="Describí el objeto de la contratación..."
-              error={errors.objeto?.message}
-              {...register("objeto")}
-            />
+            <div className="flex flex-col gap-1">
+              {renderLabelWithBadge("rubro", "Rubro", "rubro")}
+              <Select
+                id="rubro"
+                placeholder="Seleccioná un rubro"
+                options={RUBROS.map((r) => ({ value: r, label: r }))}
+                error={errors.rubro?.message}
+                {...register("rubro")}
+              />
+            </div>
 
-            <Input
-              label="Fecha de convocatoria"
-              type="date"
-              error={errors.fechaConvocatoria?.message}
-              {...register("fechaConvocatoria")}
-            />
+            <div className="flex flex-col gap-1">
+              {renderLabelWithBadge("objeto", "Objeto de contratación", "objeto")}
+              <Textarea
+                id="objeto"
+                placeholder="Describí el objeto de la contratación..."
+                error={errors.objeto?.message}
+                {...register("objeto")}
+              />
+            </div>
 
-            <Input
-              label="Fecha/hora de apertura"
-              type="datetime-local"
-              error={errors.fechaApertura?.message}
-              {...register("fechaApertura")}
-            />
+            <div className="flex flex-col gap-1">
+              {renderLabelWithBadge("fecha-convocatoria", "Fecha de convocatoria", "fechaConvocatoria")}
+              <Input
+                id="fecha-convocatoria"
+                type="date"
+                error={errors.fechaConvocatoria?.message}
+                {...register("fechaConvocatoria")}
+              />
+            </div>
 
-            <Input
-              label="Presupuesto oficial (opcional)"
-              type="number"
-              placeholder="Ej: 1500000"
-              error={errors.presupuestoOficial?.message}
-              {...register("presupuestoOficial")}
-            />
+            <div className="flex flex-col gap-1">
+              {renderLabelWithBadge("fecha-apertura", "Fecha/hora de apertura", "fechaApertura")}
+              <Input
+                id="fecha-apertura"
+                type="datetime-local"
+                error={errors.fechaApertura?.message}
+                {...register("fechaApertura")}
+              />
+            </div>
 
+            <div className="flex flex-col gap-1">
+              {renderLabelWithBadge("presupuesto-oficial", "Presupuesto oficial (opcional)", "presupuestoOficial")}
+              <Input
+                id="presupuesto-oficial"
+                type="number"
+                placeholder="Ej: 1500000"
+                error={errors.presupuestoOficial?.message}
+                {...register("presupuestoOficial")}
+              />
+            </div>
+
+            {/* No AI badge for criterioAdjudicacion */}
             <Input
               label="Criterio de adjudicación (opcional)"
               placeholder="Ej: Mejor relación precio-calidad"
@@ -187,7 +290,7 @@ export default function NuevaLicitacionPage() {
             />
 
             <FileUpload
-              label="Pliego / Documento (PDF, máx. 10 MB)"
+              label="Pliego / Documento (PDF, JPG o PNG, máx. 10 MB)"
               onChange={setFileUpload}
             />
 
@@ -198,14 +301,18 @@ export default function NuevaLicitacionPage() {
               <input type="hidden" name="documentName" value={fileUpload.fileName} />
             )}
 
-            <Select
-              label="Estado"
-              placeholder="Seleccioná un estado"
-              options={ESTADOS.map((e) => ({ value: e, label: e }))}
-              error={errors.estado?.message}
-              {...register("estado")}
-            />
+            <div className="flex flex-col gap-1">
+              {renderLabelWithBadge("estado", "Estado", "estado")}
+              <Select
+                id="estado"
+                placeholder="Seleccioná un estado"
+                options={ESTADOS.map((e) => ({ value: e, label: e }))}
+                error={errors.estado?.message}
+                {...register("estado")}
+              />
+            </div>
 
+            {/* No AI badge for fuenteUrl */}
             <Input
               label="Fuente oficial URL (opcional)"
               type="url"
@@ -226,6 +333,15 @@ export default function NuevaLicitacionPage() {
           </form>
         </Card>
       </main>
+
+      {/* ── AI Extraction Modal ─────────────────────────────────── */}
+      {showModal && fileUpload.file && (
+        <AiExtractModal
+          file={fileUpload.file}
+          onComplete={handleAiComplete}
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </div>
   );
 }

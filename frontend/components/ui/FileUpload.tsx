@@ -43,9 +43,9 @@ export function FileUpload({ label, error, onChange }: FileUploadProps) {
         return;
       }
 
-      // Validate PDF
-      if (file.type !== "application/pdf") {
-        const err = "Solo se aceptan archivos PDF.";
+      // Validate PDF, JPG, PNG
+      if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+        const err = "Solo se aceptan archivos PDF, JPG o PNG.";
         setLocalError(err);
         onChange?.({ file: null, hash: "", fileName: "" });
         return;
@@ -101,7 +101,7 @@ export function FileUpload({ label, error, onChange }: FileUploadProps) {
           ref={inputRef}
           id={inputId}
           type="file"
-          accept=".pdf,application/pdf"
+          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
           onChange={handleFileChange}
           className="hidden"
           aria-invalid={!!displayError}
@@ -114,7 +114,7 @@ export function FileUpload({ label, error, onChange }: FileUploadProps) {
             onClick={() => inputRef.current?.click()}
             className="text-sm text-blue-600 underline hover:text-blue-800"
           >
-            Hacé clic para seleccionar un PDF
+            Hacé clic para seleccionar un archivo
           </button>
         ) : (
           <div className="flex flex-col gap-2">
