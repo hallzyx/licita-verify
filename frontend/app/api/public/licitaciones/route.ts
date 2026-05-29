@@ -2,6 +2,30 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getPublicClient } from "@/lib/arkiv/client";
 import { eq, gte, lte } from "@arkiv-network/sdk/query";
+import {
+  TIPOS_PROCEDIMIENTO,
+  TIPOS_PROCEDIMIENTO_MACHINE,
+  RUBROS,
+  RUBROS_MACHINE,
+  ESTADOS,
+  ESTADOS_MACHINE,
+} from "@/lib/validacion";
+
+/**
+ * Maps a display enum value to its corresponding machine value
+ * by index lookup, or returns the original if no match.
+ */
+function toMachine(key: string, value: string): string {
+  const maps: Record<string, { display: readonly string[]; machine: readonly string[] }> = {
+    rubro: { display: RUBROS, machine: RUBROS_MACHINE },
+    estado: { display: ESTADOS, machine: ESTADOS_MACHINE },
+    tipoProcedimiento: { display: TIPOS_PROCEDIMIENTO, machine: TIPOS_PROCEDIMIENTO_MACHINE },
+  };
+  const map = maps[key];
+  if (!map) return value;
+  const idx = map.display.indexOf(value as typeof map.display[number]);
+  return idx >= 0 && idx < map.machine.length ? map.machine[idx] : value;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,16 +60,16 @@ export async function GET(request: NextRequest) {
       query.where(eq("organismo", organismo));
     }
     if (rubro) {
-      query.where(eq("rubro", rubro));
+      query.where(eq("rubro", toMachine("rubro", rubro)));
     }
     if (estado) {
-      query.where(eq("estado", estado));
+      query.where(eq("estado", toMachine("estado", estado)));
     }
     if (jurisdiccion) {
       query.where(eq("jurisdiccion", jurisdiccion));
     }
     if (tipoProcedimiento) {
-      query.where(eq("tipoProcedimiento", tipoProcedimiento));
+      query.where(eq("tipoProcedimiento", toMachine("tipoProcedimiento", tipoProcedimiento)));
     }
     if (montoMin) {
       query.where(gte("presupuestoOficial", Number(montoMin)));
