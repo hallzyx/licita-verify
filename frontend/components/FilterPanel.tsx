@@ -58,18 +58,12 @@ export function FilterPanel() {
       if (value.trim()) params.set(key, value.trim());
     }
 
-    router.push(`/buscar?${params.toString()}`);
+    router.push(`/manual?${params.toString()}`);
   }
 
   function clear() {
     setFilters(emptyFilters);
-
-    const params = new URLSearchParams();
-    const existingQ = searchParams.get("q");
-    if (existingQ) params.set("q", existingQ);
-
-    const href = params.toString() ? `/buscar?${params.toString()}` : "/buscar";
-    router.push(href);
+    router.push("/manual");
   }
 
   const hasActiveFilters = Object.values(filters).some((v) => v.trim());
