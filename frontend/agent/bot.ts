@@ -83,22 +83,34 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
+// ─── Timeout helper ────────────────────────────────────────────────────
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 // ─── DeepSeek "cerebro" del agente ─────────────────────────────────────
 
-const SYSTEM_PROMPT = `Sos un asistente de LicitaVerify, un sistema de transparencia de licitaciones públicas registradas en Arkiv blockchain.
+const SYSTEM_PROMPT = `Sos un asistente de LicitaVerify para consultar licitaciones públicas en Arkiv blockchain.
 
-Tu función es ayudar a los usuarios a consultar licitaciones públicas. Tenés estas capacidades:
+REGLAS ESTRICTAS:
+1. SALUDO: "hola", "buenos días" → responded amable, ofrecé ayuda.
+2. CHIT-CHAT: charla informal → responded breve, orientá a tu función.
+3. BÚSQUEDA: si el usuario pregunta por licitaciones, contrataciones, obras, expedientes, montos, fechas, proveedores → responded ÚNICAMENTE con "BUSCAR: <consulta>". Sin saludos, sin explicaciones. Solo "BUSCAR: <consulta>".
+4. NO SABÉS: si no entendés o falta información → pedí aclaración simple.
 
-1. SALUDAR: Si el usuario saluda (hola, buenos días, etc.), responded con un saludo amable y ofrecé ayuda.
-2. CHIT_CHAT: Si es charla informal, responded de forma amable pero orientá a tu función de búsqueda.
-3. BUSCAR: Si el usuario pregunta por licitaciones, contrataciones, obras, expedientes o similares, responded con "BUSCAR: <consulta>" y yo ejecutaré la búsqueda.
-4. AYUDAR: Si el usuario pide ayuda o no sabés qué hacer, responded con "AYUDA".
-
-IMPORTANTE: 
-- No inventes resultados de búsqueda. Si no estás seguro de qué buscar, pedí aclaración.
-- Respondé SIEMPRE en español argentino, amable y directo.
-- Si el mensaje es una consulta de búsqueda, responded ÚNICAMENTE con "BUSCAR: " seguido de la consulta reformulada para búsqueda.
-- Para cualquier otra cosa, responded naturalmente sin prefijo.`;
+REGLAS DE FORMATO:
+- "BUSCAR:" debe estar al PRINCIPIO del mensaje, sin nada antes.
+- Reformulá la consulta para búsqueda: extraé organismo, rubro, tipo, monto, fecha, estado.
+- Ej: "mostrame obras de la municipalidad de salta" → "BUSCAR: obras públicas municipalidad de salta"
+- Ej: "hola" → responded naturalmente
+- Ej: "gracias" → responded naturalmente
+- Respondé SIEMPRE en español argentino, directo y sin florituras.`;
 
 interface AgentDecision {
   action: "search" | "chat" | "help";
@@ -116,12 +128,15 @@ async function agentThink(chatId: number, userMessage: string): Promise<AgentDec
     { role: "user", content: userMessage },
   ];
 
-  const res = await deepseek.chat.completions.create({
-    model: "deepseek-chat",
-    messages,
-    temperature: 0.3,
-    max_tokens: 500,
-  });
+  const res = await withTimeout(
+    deepseek.chat.completions.create({
+      model: "deepseek-chat",
+      messages,
+      temperature: 0.3,
+      max_tokens: 500,
+    }),
+    15000, // 15s timeout
+  );
 
   const reply = res.choices[0]?.message?.content?.trim() || "";
 
@@ -273,24 +288,66 @@ bot.command("reiniciar", async (ctx) => {
   await ctx.reply("✅ Conversación reiniciada. Decime cómo querés buscar.");
 });
 
+/**
+ * Intenta extraer una consulta de búsqueda de la respuesta de DeepSeek.
+ * Si la respuesta contiene "BUSCAR:" lo usa; si no, detecta palabras clave
+ * de búsqueda y usa el mensaje original del usuario.
+ */
+function extractQuery(response: string | undefined, originalUserMessage: string): string | null {
+  if (!response) return null;
+
+  // Prefijo explícito BUSCAR:
+  const explicit = response.match(/BUSCAR:\s*(.+)/i);
+  if (explicit) return explicit[1].trim();
+
+  // Si la respuesta sugiere búsqueda pero no usó el prefijo, usar el original
+  const searchKeywords = /buscar|encontrar|mostrame|listar|consultar|licitaciones?|obras?|contrataciones?/i;
+  if (searchKeywords.test(response) || searchKeywords.test(originalUserMessage)) {
+    return originalUserMessage;
+  }
+
+  return null;
+}
+
+function buildNoResultsMessage(filters: Record<string, unknown>): string {
+  const labels: string[] = [];
+  for (const [key, val] of Object.entries(filters)) {
+    if (Array.isArray(val) && val.length > 0) labels.push(`${key}: ${val.join(", ")}`);
+    else if (typeof val === "number") labels.push(`${key}: ${val}`);
+    else if (typeof val === "string" && val) labels.push(`${key}: ${val}`);
+  }
+  const filtersText = labels.length > 0 ? ` con los filtros "${labels.join(", ")}"` : "";
+  return `No encontré resultados${filtersText}. Probá:\n• Buscar por otro organismo\n• Usar palabras más generales\n• Preguntar sin filtrar por organismo específico`;
+}
+
 // Mensajes de texto
 bot.on("message:text", async (ctx) => {
   const chatId = ctx.chat.id;
   const text = ctx.message.text.trim();
 
-  if (text.startsWith("/")) return; // comandos ya manejados
+  if (text.startsWith("/")) return;
 
   try {
     await ctx.api.sendChatAction(chatId, "typing");
 
-    // DeepSeek decide qué hacer
+    // ── Paso 1: DeepSeek decide qué hacer ──────────────────
     const decision = await agentThink(chatId, text);
 
+    // ── Paso 2: Si es charla sin intención de buscar ──────
     if (decision.action === "chat" && decision.response) {
-      await ctx.reply(decision.response, { parse_mode: "Markdown" });
-      return;
+      // Verificar si igual tiene intención de búsqueda
+      const searchQuery = extractQuery(decision.response, text);
+      if (!searchQuery) {
+        // Es charla real → responder nomás
+        await ctx.reply(decision.response, { parse_mode: "Markdown" });
+        return;
+      }
+      // Tiene intención de búsqueda → caer en el caso search
+      decision.action = "search";
+      decision.searchQuery = searchQuery;
     }
 
+    // ── Paso 3: Buscar ─────────────────────────────────────
     if (decision.action === "search") {
       const query = decision.searchQuery || text;
       await ctx.api.sendChatAction(chatId, "typing");
@@ -299,7 +356,7 @@ bot.on("message:text", async (ctx) => {
 
       if (parsed.ambiguous) {
         await ctx.reply(
-          `🤔 *No entendí bien*\n\n${parsed.clarification}\n\nSugerencias:\n${parsed.suggestions.map((s: string) => `• "${s}"`).join("\n")}`,
+          `🤔 No entendí bien.\n\n${parsed.clarification}\n\nSugerencias:\n${parsed.suggestions.map((s: string) => `• "${s}"`).join("\n")}`,
           { parse_mode: "Markdown" },
         );
         return;
@@ -308,7 +365,7 @@ bot.on("message:text", async (ctx) => {
       const results = await searchArkiv(parsed.filters);
 
       if (results.length === 0) {
-        await ctx.reply("No encontré resultados. Probá con otros filtros o decime más detalles.");
+        await ctx.reply(buildNoResultsMessage(parsed.filters as unknown as Record<string, unknown>));
         return;
       }
 
