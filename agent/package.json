@@ -7,12 +7,13 @@
     "agent": "tsx src/index.ts"
   },
   "dependencies": {
-    "ai": "^6.0.193",
     "@ai-sdk/deepseek": "^2.0.35",
+    "@ai-sdk/mcp": "^1.0.44",
     "@arkiv-network/sdk": "^0.6.8",
-    "zod": "^4.4.3",
+    "ai": "^6.0.193",
     "dotenv": "^17.4.2",
-    "grammy": "^1.43.0"
+    "grammy": "^1.43.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "tsx": "^4.22.3",

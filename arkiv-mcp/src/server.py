@@ -14,6 +14,8 @@ O instalación global:
 
 import os
 import json
+import re
+import sys
 from typing import Any
 from dotenv import load_dotenv
 import httpx
@@ -21,29 +23,63 @@ from fastmcp import FastMCP
 
 load_dotenv()
 
-RPC_URL = os.getenv("ARKIV_RPC_URL", "https://rpc.braga.arkiv.network")
+RPC_URL = os.getenv("ARKIV_RPC_URL", "https://braga.hoodi.arkiv.network/rpc")
 EXPLORER_URL = os.getenv("ARKIV_EXPLORER_URL", "https://explorer.braga.arkiv.network")
 
 mcp = FastMCP("Arkiv Explorer")
 
-# ─── JSON-RPC helper ──────────────────────────────────────────────────
+# ─── Helpers ───────────────────────────────────────────────────────────
 
 
-def rpc_call(method: str, params: list[Any]) -> dict[str, Any]:
-    """Execute a JSON-RPC call to the Arkiv node."""
+def _sanitize_arkiv_query(query: str) -> str:
+    """
+    Sanitiza una query string de Arkiv:
+    - Arkiv NO acepta floats, solo enteros. Removemos '.0' de números.
+      Ej: '>= 1000000.0' → '>= 1000000'
+    """
+    return re.sub(r"(\d+)\.0\b", r"\1", query)
+
+
+def rpc_call(method: str, params: list[Any], retry: bool = True) -> dict[str, Any]:
+    """Execute a JSON-RPC call to the Arkiv node.
+
+    Sanitiza automáticamente queries arkiv_query para remover floats.
+    Reintenta una vez si Arkiv responde con 'context cancelled' (timeout).
+    """
+    # Sanitize arkiv_query params (defense in depth contra floats)
+    if method == "arkiv_query" and params and isinstance(params[0], str):
+        params[0] = _sanitize_arkiv_query(params[0])
+
     payload = {
         "jsonrpc": "2.0",
         "method": method,
         "params": params,
         "id": 1,
     }
-    with httpx.Client(timeout=30) as client:
-        resp = client.post(RPC_URL, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
-        if "error" in data:
-            raise RuntimeError(f"Arkiv RPC error: {data['error']}")
-        return data["result"]
+    try:
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(RPC_URL, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            if "error" in data:
+                err_msg = str(data["error"])
+                # Reintentar una vez si es timeout del nodo
+                if retry and "context cancelled" in err_msg:
+                    import time as _time
+
+                    _time.sleep(1)
+                    return rpc_call(method, params, retry=False)
+                raise RuntimeError(f"Arkiv RPC error: {data['error']}")
+            return data["result"]
+    except httpx.TimeoutException:
+        if retry:
+            import time as _time
+
+            _time.sleep(1)
+            return rpc_call(method, params, retry=False)
+        raise RuntimeError(
+            "La consulta tardó demasiado. Probá con filtros más específicos."
+        )
 
 
 # ─── Tools ─────────────────────────────────────────────────────────────
@@ -52,18 +88,19 @@ def rpc_call(method: str, params: list[Any]) -> dict[str, Any]:
 @mcp.tool(
     name="arkiv_search",
     description="Buscar licitaciones públicas en Arkiv. "
-    "Filtros disponibles: rubro, estado, organismo, jurisdiccion, "
+    "Filtros: rubro, estado, organismo, jurisdiccion, "
     "tipoProcedimiento, montoMin, montoMax. "
-    "Devuelve lista de resultados con entityKey, attributes y payload.",
+    "Usá SOLO estos nombres exactos. "
+    "Devuelve lista con entityKey, attributes y payload.",
 )
 def search_entities(
     rubro: str | None = None,
     estado: str | None = None,
     organismo: str | None = None,
     jurisdiccion: str | None = None,
-    tipo_procedimiento: str | None = None,
-    monto_min: float | None = None,
-    monto_max: float | None = None,
+    tipoProcedimiento: str | None = None,
+    montoMin: float | None = None,
+    montoMax: float | None = None,
     limite: int = 10,
 ) -> str:
     """
@@ -74,11 +111,27 @@ def search_entities(
         estado: Estado (convocada, evaluacion, adjudicada, etc.)
         organismo: Nombre del organismo contratante
         jurisdiccion: Provincia o jurisdiccion
-        tipo_procedimiento: Tipo de procedimiento
-        monto_min: Monto minimo en ARS
-        monto_max: Monto maximo en ARS
+        tipoProcedimiento: Tipo de procedimiento
+        montoMin: Monto minimo en ARS (se aplica como presupuestoOficial >= valor)
+        montoMax: Monto maximo en ARS (se aplica como presupuestoOficial <= valor)
         limite: Maximo de resultados (max 20)
     """
+    _active = {}
+    if rubro:
+        _active["rubro"] = rubro
+    if estado:
+        _active["estado"] = estado
+    if organismo:
+        _active["organismo"] = organismo
+    if jurisdiccion:
+        _active["jurisdiccion"] = jurisdiccion
+    if tipoProcedimiento:
+        _active["tipoProcedimiento"] = tipoProcedimiento
+    if montoMin is not None:
+        _active["montoMin"] = montoMin
+    if montoMax is not None:
+        _active["montoMax"] = montoMax
+    print(f"[mcp] arkiv_search filters={_active}", file=sys.stderr)
     # Build Arkiv query string
     conditions = [
         'project = "licita-verify-v1"',
@@ -93,31 +146,53 @@ def search_entities(
         conditions.append(f'organismo = "{organismo}"')
     if jurisdiccion:
         conditions.append(f'jurisdiccion = "{jurisdiccion}"')
-    if tipo_procedimiento:
-        conditions.append(f'tipoProcedimiento = "{tipo_procedimiento}"')
-    if monto_min is not None:
-        conditions.append(f"presupuestoOficial >= {monto_min}")
-    if monto_max is not None:
-        conditions.append(f"presupuestoOficial <= {monto_max}")
+    if tipoProcedimiento:
+        conditions.append(f'tipoProcedimiento = "{tipoProcedimiento}"')
+    if montoMin is not None:
+        conditions.append(f"presupuestoOficial >= {int(montoMin)}")
+    if montoMax is not None:
+        conditions.append(f"presupuestoOficial <= {int(montoMax)}")
 
     query = " && ".join(conditions)
     limit = min(max(limite, 1), 20)
 
-    result = rpc_call(
-        "arkiv_query",
-        [
-            query,
-            {"resultsPerPage": hex(limit)},
-        ],
-    )
+    print(f"[mcp] arkiv_query: {query}", file=sys.stderr)
+
+    try:
+        result = rpc_call(
+            "arkiv_query",
+            [
+                query,
+                {"resultsPerPage": hex(limit)},
+            ],
+        )
+    except RuntimeError as e:
+        return f"Error al buscar: {e}. Probá con filtros más específicos (rubro, estado, etc.)."
 
     # Parse response
     entities = []
-    for item in result.get("entities", []):
+    for item in result.get("data", []):
+        # Parse stringAttributes and numericAttributes into a flat dict
+        attrs = {}
+        for attr in item.get("stringAttributes", []):
+            attrs[attr["key"]] = attr["value"]
+        for attr in item.get("numericAttributes", []):
+            attrs[attr["key"]] = attr["value"]
+
+        # Decode payload from hex
+        payload = {}
+        value_hex = item.get("value", "")
+        if value_hex and value_hex.startswith("0x"):
+            try:
+                payload_bytes = bytes.fromhex(value_hex[2:])
+                payload = json.loads(payload_bytes.decode("utf-8"))
+            except (ValueError, json.JSONDecodeError):
+                pass
+
         entity = {
             "entityKey": item.get("key", ""),
-            "attributes": item.get("attributes", {}),
-            "payload": item.get("payload", {}),
+            "attributes": attrs,
+            "payload": payload,
         }
         entities.append(entity)
 
@@ -160,10 +235,32 @@ def get_entity(entity_key: str) -> str:
     Args:
         entity_key: Entity key en formato 0x...
     """
-    result = rpc_call("arkiv_getEntity", [entity_key])
+    print(f"[mcp] arkiv_get_entity key={entity_key}", file=sys.stderr)
+    try:
+        result = rpc_call("arkiv_getEntity", [entity_key])
+    except RuntimeError as e:
+        return f"Error al obtener entidad: {e}"
 
-    payload = result.get("payload", {})
-    attributes = result.get("attributes", {})
+    if not result:
+        return f"No se encontró la entidad {entity_key}."
+
+    # Parse stringAttributes and numericAttributes into a flat dict
+    attributes = {}
+    for attr in result.get("stringAttributes", []):
+        attributes[attr["key"]] = attr["value"]
+    for attr in result.get("numericAttributes", []):
+        attributes[attr["key"]] = attr["value"]
+
+    # Decode payload from hex
+    payload = {}
+    value_hex = result.get("value", "")
+    if value_hex and value_hex.startswith("0x"):
+        try:
+            payload_bytes = bytes.fromhex(value_hex[2:])
+            payload = json.loads(payload_bytes.decode("utf-8"))
+        except (ValueError, json.JSONDecodeError):
+            pass
+
     merged = {**attributes, **payload}
 
     lines = [
@@ -220,21 +317,13 @@ def get_entity(entity_key: str) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool(
-    name="arkiv_raw_query",
-    description="Ejecutar una consulta raw a Arkiv usando su sintaxis "
-    'de búsqueda. Ej: \'rubro = "obra" && estado = "convocada"\'. '
-    "Ver documentación en docs.arkiv.network/json-rpc/querying-data/",
-)
-def raw_query(query: str, limite: int = 10) -> str:
-    """
-    Execute a raw Arkiv query string.
-
-    Args:
-        query: Query string usando sintaxis Arkiv
-               (operadores: =, !=, <, >, <=, >=, ~, &&, ||, !)
-        limite: Maximo de resultados (max 20)
-    """
+# NOTA: arkiv_raw_query fue eliminada como tool expuesta porque el LLM
+# construía queries con floats (ej: presupuestoOficial >= 1000000.0) que
+# Arkiv no acepta. Usar arkiv_search con filtros estructurados en su lugar.
+# La función se mantiene como internal para debugging.
+def _raw_query(query: str, limite: int = 10) -> str:
+    """(internal) Execute a raw Arkiv query string."""
+    print(f"[mcp] _raw_query query={query[:100]}...", file=sys.stderr)
     limit = min(max(limite, 1), 20)
     result = rpc_call(
         "arkiv_query",
@@ -245,12 +334,29 @@ def raw_query(query: str, limite: int = 10) -> str:
     )
 
     entities = []
-    for item in result.get("entities", []):
+    for item in result.get("data", []):
+        # Parse stringAttributes and numericAttributes into a flat dict
+        attrs = {}
+        for attr in item.get("stringAttributes", []):
+            attrs[attr["key"]] = attr["value"]
+        for attr in item.get("numericAttributes", []):
+            attrs[attr["key"]] = attr["value"]
+
+        # Decode payload from hex
+        payload = {}
+        value_hex = item.get("value", "")
+        if value_hex and value_hex.startswith("0x"):
+            try:
+                payload_bytes = bytes.fromhex(value_hex[2:])
+                payload = json.loads(payload_bytes.decode("utf-8"))
+            except (ValueError, json.JSONDecodeError):
+                pass
+
         entities.append(
             {
                 "entityKey": item.get("key", ""),
-                "attributes": item.get("attributes", {}),
-                "payload": item.get("payload", {}),
+                "attributes": attrs,
+                "payload": payload,
             }
         )
 

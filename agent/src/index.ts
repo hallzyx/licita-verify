@@ -1,17 +1,14 @@
 /**
  * LicitaVerify Agent — Autonomous Telegram Bot con ai-sdk v6.
- *
- * Proceso standalone con long polling.
- * Usa ai-sdk generateText + tools para decidir autónomamente
- * si saludar, buscar en Arkiv, o pedir aclaración.
+ * Tools via @ai-sdk/mcp conectado al Arkiv MCP Server (Python).
  *
  * Corre: npm run agent
  */
 import "dotenv/config";
 import { Bot, InlineKeyboard } from "grammy";
 import { runAgent } from "./agent";
-import { searchLicitaciones, getDetalle } from "./arkiv-tools";
-import { buildResultsMessage, buildDetailMessage } from "./formatters";
+import { getArkivTools as getTools, closeMcp } from "./mcp-client";
+import { buildDetailMessage } from "./formatters";
 
 // ─── Config ────────────────────────────────────────────────────────────
 
@@ -51,11 +48,11 @@ bot.on("message:text", async (ctx) => {
     await ctx.api.sendChatAction(chatId, "typing");
     console.log(`[user] "${text}"`);
 
+    // Obtener tools del MCP server (se cachean tras primera llamada)
+    const tools = await getTools();
+
     // ── ai-sdk agente autónomo ─────────────────────────────
-    const result = await runAgent(text, {
-      searchLicitaciones,
-      getDetalle,
-    });
+    const result = await runAgent(text, tools);
 
     console.log(`[agent] response="${result.text.slice(0, 120)}..."`);
 
@@ -65,20 +62,12 @@ bot.on("message:text", async (ctx) => {
       return;
     }
 
-    // Si llamó a searchLicitaciones y encontró resultados
+    // Si llamó a arkiv_search — el agente ya formateó los resultados
     if (result.searchResults) {
-      const { text: msgText, keyboard } = buildResultsMessage(
-        result.searchResults,
-        result.text,
-      );
-      await ctx.reply(msgText, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
+      await ctx.reply(result.text, { parse_mode: "Markdown" });
       return;
     }
 
-    // Otro caso (sin resultados, error, etc.)
     await ctx.reply(result.text, { parse_mode: "Markdown" });
   } catch (err) {
     console.error("[bot] error:", err);
@@ -96,8 +85,10 @@ bot.on("callback_query:data", async (ctx) => {
   if (data.startsWith("detail:") && chatId && msgId) {
     const entityKey = data.slice(7);
     try {
-      const entity = await getDetalle.execute({ entityKey });
-      const detail = buildDetailMessage(entity as any, entityKey);
+      const tools = await getTools();
+      const detailTool = tools["arkiv_get_entity"] as { execute: (args: Record<string, unknown>) => Promise<unknown> };
+      const result = await detailTool.execute({ entity_key: entityKey });
+      const detail = typeof result === "string" ? result : JSON.stringify(result, null, 2);
       const keyboard = new InlineKeyboard().text("← Volver", "back");
       await ctx.api.editMessageText(chatId, msgId, detail, {
         parse_mode: "Markdown",
@@ -117,12 +108,18 @@ bot.on("callback_query:data", async (ctx) => {
 
 bot.catch((err) => console.error("[bot] unhandled:", err));
 
-// ─── Start ─────────────────────────────────────────────────────────────
+// ─── Start / Cleanup ───────────────────────────────────────────────────
 
-console.log("🤖 LicitaVerify Agent (ai-sdk v6)");
+process.on("SIGINT", async () => {
+  console.log("\n🔌 Cerrando conexiones...");
+  await closeMcp().catch(() => {});
+  process.exit(0);
+});
+
+console.log("🤖 LicitaVerify Agent (ai-sdk v6 + @ai-sdk/mcp)");
 console.log("   Cerebro: DeepSeek via @ai-sdk/openai");
-console.log("   Datos:   Arkiv Braga testnet");
-console.log("   Tools:   searchLicitaciones, getDetalle");
+console.log("   Datos:   Arkiv vía MCP (Python FastMCP)");
+console.log(   "   Tools:   arkiv_search, arkiv_get_entity");
 console.log("   Presioná Ctrl+C para detener");
 
 bot.start().catch((err) => { console.error("Fatal:", err); process.exit(1); });

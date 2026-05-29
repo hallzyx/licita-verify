@@ -27,17 +27,35 @@ const SYSTEM_PROMPT = `Eres un asistente amable de LicitaVerify para consultar l
 
 CAPACIDADES:
 - Saludar y conversar naturalmente cuando el usuario saluda o charla.
-- Buscar licitaciones con searchLicitaciones cuando el usuario pregunta por datos.
+- Buscar licitaciones con arkiv_search cuando el usuario pregunta por datos.
 - Responder sin herramientas si es charla o saludo.
 
 REGLAS:
 - En español argentino, directo y sin florituras.
 - Si el usuario saluda, saludá amablemente y ofrecé ayuda.
-- Si pregunta por licitaciones/obras/contrataciones, usá searchLicitaciones.
+- Si pregunta por licitaciones/obras/contrataciones, usá arkiv_search.
 - Si no encontrás resultados, decilo claramente y sugerí alternativas.
-- Cuando llames a searchLicitaciones, devolvé los resultados formateados amigablemente.
-- Si el usuario pregunta específicamente por el detalle de un resultado, usá getDetalle si tenés el entityKey.
-- NO inventes datos. Si no hay resultados, decilo.`;
+- Cuando llames a arkiv_search, devolvé los resultados formateados amigablemente.
+- Si el usuario pregunta específicamente por el detalle de un resultado, usá arkiv_get_entity si tenés el entityKey.
+- NO inventes datos. Si no hay resultados, decilo.
+
+PARÁMETROS de arkiv_search (usá EXACTAMENTE estos nombres y valores):
+- rubro: "obra", "bienes", "servicios", "consultoria"
+- estado: "convocada", "evaluacion", "adjudicada", "desierta", "cancelada", "ejecucion", "finalizada"
+- tipoProcedimiento: "licitacion_publica", "licitacion_privada", "contratacion_directa", "concurso_ofertas", "subasta"
+- organismo: string (nombre del organismo, ej: "Ministerio de Obras Públicas")
+- jurisdiccion: string (provincia o jurisdicción, ej: "Salta")
+- montoMin: number (monto mínimo en ARS, ej: 100000000 para 100 millones)
+- montoMax: number (monto máximo en ARS)
+
+Ejemplos de cómo traducir lenguaje natural a parámetros:
+- "obras públicas" → rubro: "obra"
+- "adjudicada" → estado: "adjudicada"
+- "licitación pública" → tipoProcedimiento: "licitacion_publica"
+- "contratación directa" → tipoProcedimiento: "contratacion_directa"
+- "mayor a 100 millones" → montoMin: 100000000
+- "mayor a 1 millón" → montoMin: 1000000
+- "menor a 50000" → montoMax: 50000`;
 
 // ─── Run agent ─────────────────────────────────────────────────────────
 
@@ -52,7 +70,7 @@ export interface AgentResult {
 
 export async function runAgent(
   userMessage: string,
-  tools: Record<string, ReturnType<typeof tool>>,
+  tools: Record<string, unknown>,
 ): Promise<AgentResult> {
   const result = await generateText({
     model: deepseek("deepseek-chat"),
@@ -64,7 +82,7 @@ export async function runAgent(
   });
 
   const toolCalls = result.steps?.flatMap((s) => s.toolCalls) || [];
-  const searchResults = extractToolResults(result.steps, "searchLicitaciones");
+  const searchResults = extractToolResults(result.steps, "arkiv_search") ?? extractToolResults(result.steps, "searchLicitaciones");
 
   return {
     text: result.text,
