@@ -1,0 +1,21 @@
+{
+  "name": "licitaverify-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "agent": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "ai": "^6.0.193",
+    "@ai-sdk/deepseek": "^2.0.35",
+    "@arkiv-network/sdk": "^0.6.8",
+    "zod": "^4.4.3",
+    "dotenv": "^17.4.2",
+    "grammy": "^1.43.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.22.3",
+    "typescript": "^5"
+  }
+}

@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "agent": "tsx agent/bot.ts"
   },
   "dependencies": {
     "@arkiv-network/sdk": "^0.6.8",
