@@ -8,7 +8,8 @@
  * - DeepSeek (parseSearchQuery) para interpretar lenguaje natural
  * - Arkiv PublicClient para consultar datos on-chain
  */
-import "dotenv/config";
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
 import { Bot, InlineKeyboard } from "grammy";
 import { createPublicClient, http } from "@arkiv-network/sdk";
 import { braga } from "@arkiv-network/sdk/chains";
