@@ -17,14 +17,13 @@ let client: Awaited<ReturnType<typeof createMCPClient>> | null = null;
 let toolsCache: Record<string, unknown> | null = null;
 
 /**
- * Obtiene las tools del MCP server de Arkiv.
- * Cachea la conexión y las tools — llamar múltiples veces es seguro.
+ * Inicializa la conexión MCP al arrancar el bot (eager).
+ * Se llama una vez desde index.ts al iniciar.
  */
-export async function getArkivTools(): Promise<Record<string, unknown>> {
-  if (toolsCache) return toolsCache;
+export async function initMcp(): Promise<void> {
+  if (client) return;
 
   const mcpDir = path.resolve(__dirname, "../../arkiv-mcp");
-  const serverPath = path.join(mcpDir, "src", "server.py");
 
   console.log(`[mcp] connecting to Arkiv MCP server...`);
 
@@ -38,8 +37,18 @@ export async function getArkivTools(): Promise<Record<string, unknown>> {
 
   toolsCache = await client.tools();
   console.log(`[mcp] connected — tools: ${Object.keys(toolsCache).join(", ")}`);
+}
 
-  return toolsCache;
+/**
+ * Devuelve las tools cacheadas del MCP server.
+ * Debe llamarse DESPUÉS de initMcp(). Si no se inicializó, lo hace lazy.
+ */
+export async function getArkivTools(): Promise<Record<string, unknown>> {
+  if (!client) {
+    console.warn("[mcp] getArkivTools called before initMcp — initializing lazy");
+    await initMcp();
+  }
+  return toolsCache!;
 }
 
 /**

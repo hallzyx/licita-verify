@@ -7,7 +7,7 @@
 import "dotenv/config";
 import { Bot, InlineKeyboard } from "grammy";
 import { runAgent } from "./agent";
-import { getArkivTools as getTools, closeMcp } from "./mcp-client";
+import { getArkivTools as getTools, initMcp, closeMcp } from "./mcp-client";
 import { buildDetailMessage } from "./formatters";
 
 // ─── Config ────────────────────────────────────────────────────────────
@@ -20,9 +20,14 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN);
 
+// ─── Conversation memory ───────────────────────────────────────────────
+// Store message history per chat so the agent remembers context.
+const chatHistory = new Map<number, Array<{ role: "user" | "assistant"; content: string }>>();
+
 // ─── Handlers ──────────────────────────────────────────────────────────
 
 bot.command("start", async (ctx) => {
+  chatHistory.delete(ctx.chat.id);
   const msg =
     "🤖 *Hola! Soy el agente de LicitaVerify*\n\n"
     + "Preguntame sobre licitaciones públicas registradas en Arkiv blockchain.\n\n"
@@ -36,6 +41,7 @@ bot.command("start", async (ctx) => {
 });
 
 bot.command("reiniciar", async (ctx) => {
+  chatHistory.delete(ctx.chat.id);
   await ctx.reply("✅ Conversación reiniciada.");
 });
 
@@ -48,23 +54,45 @@ bot.on("message:text", async (ctx) => {
     await ctx.api.sendChatAction(chatId, "typing");
     console.log(`[user] "${text}"`);
 
+    // Build conversation history for context (last 3 exchanges = 6 messages)
+    const history = chatHistory.get(chatId) || [];
+    const contextMessages = history.slice(-6);
+
     // Obtener tools del MCP server (se cachean tras primera llamada)
     const tools = await getTools();
 
     // ── ai-sdk agente autónomo ─────────────────────────────
-    const result = await runAgent(text, tools);
+    const result = await runAgent(text, tools, contextMessages);
 
-    console.log(`[agent] response="${result.text.slice(0, 120)}..."`);
+    // Store this exchange in memory
+    history.push({ role: "user", content: text });
+    history.push({ role: "assistant", content: result.text });
+    chatHistory.set(chatId, history);
 
-    // Si no hay tool calls, es respuesta conversacional directa
-    if (!result.toolCalled) {
-      await ctx.reply(result.text, { parse_mode: "Markdown" });
-      return;
+    // Extract entityKeys from the agent's response (Entity Key: 0x...)
+    const entityKeys: string[] = [];
+    const keyRegex = /Entity Key:\s*(0x[a-fA-F0-9]+)/g;
+    let match;
+    while ((match = keyRegex.exec(result.text)) !== null) {
+      entityKeys.push(match[1]);
     }
 
-    // Si llamó a arkiv_search — el agente ya formateó los resultados
-    if (result.searchResults) {
-      await ctx.reply(result.text, { parse_mode: "Markdown" });
+    // If we found entity keys, add inline detail buttons
+    if (entityKeys.length > 0) {
+      const keyboard = new InlineKeyboard();
+      if (entityKeys.length === 1) {
+        keyboard.text("🔍 Ver detalle", `detail:${entityKeys[0]}`);
+      } else {
+        entityKeys.forEach((key, i) => {
+          keyboard.text(`🔍 Ver #${i + 1}`, `detail:${key}`);
+        });
+      }
+      keyboard.text("🔄 Nueva búsqueda", "back");
+
+      await ctx.reply(result.text, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
       return;
     }
 
@@ -122,4 +150,10 @@ console.log("   Datos:   Arkiv vía MCP (Python FastMCP)");
 console.log(   "   Tools:   arkiv_search, arkiv_get_entity");
 console.log("   Presioná Ctrl+C para detener");
 
-bot.start().catch((err) => { console.error("Fatal:", err); process.exit(1); });
+// Init MCP eagerly before starting to listen
+initMcp()
+  .then(() => bot.start())
+  .catch((err) => {
+    console.error("❌ Error al iniciar MCP:", err.message);
+    process.exit(1);
+  });

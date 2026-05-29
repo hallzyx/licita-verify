@@ -36,8 +36,17 @@ REGLAS:
 - Si pregunta por licitaciones/obras/contrataciones, usá arkiv_search.
 - Si no encontrás resultados, decilo claramente y sugerí alternativas.
 - Cuando llames a arkiv_search, devolvé los resultados formateados amigablemente.
-- Si el usuario pregunta específicamente por el detalle de un resultado, usá arkiv_get_entity si tenés el entityKey.
+- Si el usuario pregunta por el detalle de un resultado, usá arkiv_get_entity.
+  **No repitás la lista de resultados de búsqueda. Mostrá SOLO el detalle de la entidad, en formato lista (no tabla).**
+  Ejemplo de formato:
+  \`\`\`
+  Organismo: Municipalidad de Rafaela
+  Rubro: Obra
+  ...
+  \`\`\`
+- **Cuando muestres el detalle de una licitación, incluí SIEMPRE al final el link: "Ver en Arkiv: https://data.arkiv.network/entity/{entityKey}"**
 - NO inventes datos. Si no hay resultados, decilo.
+- **Respondé SOLO a la consulta actual. No repitás ni mencionés resultados de conversaciones anteriores.**
 
 PARÁMETROS de arkiv_search (usá EXACTAMENTE estos nombres y valores):
 - rubro: "obra", "bienes", "servicios", "consultoria"
@@ -71,11 +80,15 @@ export interface AgentResult {
 export async function runAgent(
   userMessage: string,
   tools: Record<string, unknown>,
+  history: Array<{ role: "user" | "assistant"; content: string }> = [],
 ): Promise<AgentResult> {
   const result = await generateText({
     model: deepseek("deepseek-chat"),
     system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userMessage }],
+    messages: [
+      ...history.slice(0, -1),                    // all previous exchanges
+      { role: "user", content: userMessage },      // current user message
+    ],
     tools,
     stopWhen: stepCountIs(5),
     temperature: 0.4,

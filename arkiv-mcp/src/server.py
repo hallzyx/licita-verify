@@ -24,7 +24,7 @@ from fastmcp import FastMCP
 load_dotenv()
 
 RPC_URL = os.getenv("ARKIV_RPC_URL", "https://braga.hoodi.arkiv.network/rpc")
-EXPLORER_URL = os.getenv("ARKIV_EXPLORER_URL", "https://explorer.braga.arkiv.network")
+EXPLORER_URL = os.getenv("ARKIV_EXPLORER_URL", "https://data.arkiv.network")
 
 mcp = FastMCP("Arkiv Explorer")
 
@@ -199,61 +199,87 @@ def search_entities(
     if not entities:
         return "No se encontraron resultados."
 
-    # Format output
+    # Format output — show ALL available fields
     lines = [f"Encontré {len(entities)} resultado(s):", ""]
+    field_order = [
+        "objeto",
+        "organismo",
+        "expediente",
+        "jurisdiccion",
+        "tipoProcedimiento",
+        "rubro",
+        "estado",
+        "presupuestoOficial",
+        "fechaConvocatoria",
+        "fechaApertura",
+        "criterioAdjudicacion",
+        "fuenteUrl",
+    ]
+    labels = {
+        "objeto": "Objeto",
+        "organismo": "Organismo",
+        "expediente": "Expediente",
+        "jurisdiccion": "Jurisdicción",
+        "tipoProcedimiento": "Tipo",
+        "rubro": "Rubro",
+        "estado": "Estado",
+        "presupuestoOficial": "Presupuesto",
+        "fechaConvocatoria": "Conv.",
+        "fechaApertura": "Apertura",
+        "criterioAdjudicacion": "Criterio",
+        "fuenteUrl": "Fuente",
+    }
     for i, ent in enumerate(entities, 1):
-        attrs = ent["attributes"]
-        payload = ent["payload"]
-        merged = {**attrs, **payload}
-
-        objeto = str(merged.get("objeto", "-"))[:80]
-        organismo = str(merged.get("organismo", "-"))
-        expediente = str(merged.get("expediente", ""))
-        estado_val = str(merged.get("estado", "-"))
-
-        lines.append(f"{i}. {objeto}")
-        lines.append(f"   Organismo: {organismo}")
-        if expediente:
-            lines.append(f"   Expediente: {expediente}")
-        lines.append(f"   Estado: {estado_val}")
+        merged = {**ent["attributes"], **ent["payload"]}
+        lines.append(f"*{i}. {str(merged.get('objeto', '-'))[:80]}*")
+        for field in field_order:
+            val = merged.get(field)
+            if val and field != "objeto":
+                label = labels.get(field, field)
+                val_str = str(val)[:120]
+                lines.append(f"   _{label}_: {val_str}")
         lines.append(f"   Entity Key: {ent['entityKey']}")
         lines.append("")
 
-    lines.append(f"Explorer: {EXPLORER_URL}/entity/...")
     return "\n".join(lines)
 
 
+# NOTA: arkiv_getEntity NO está whitelisted en el RPC público.
+# Usamos arkiv_query con $key (synthetic attribute) como workaround.
 @mcp.tool(
     name="arkiv_get_entity",
-    description="Obtener el detalle completo de una entidad en Arkiv "
-    "por su entityKey. Devuelve attributes y payload completos.",
+    description="Obtener el detalle completo de una licitación por su "
+    "entityKey (hash 0x...). Devuelve todos los atributos y payload.",
 )
 def get_entity(entity_key: str) -> str:
     """
-    Get full entity details from Arkiv by entity key.
+    Get full entity details from Arkiv by entity key via arkiv_query.
 
     Args:
         entity_key: Entity key en formato 0x...
     """
     print(f"[mcp] arkiv_get_entity key={entity_key}", file=sys.stderr)
+    query = f'$key = "{entity_key}"'
     try:
-        result = rpc_call("arkiv_getEntity", [entity_key])
+        result = rpc_call("arkiv_query", [query, None])
     except RuntimeError as e:
         return f"Error al obtener entidad: {e}"
 
-    if not result:
-        return f"No se encontró la entidad {entity_key}."
+    data = result.get("data", [])
+    if not data:
+        return f"No se encontró la entidad {entity_key} (puede haber expirado)."
+    item = data[0]
 
     # Parse stringAttributes and numericAttributes into a flat dict
-    attributes = {}
-    for attr in result.get("stringAttributes", []):
-        attributes[attr["key"]] = attr["value"]
-    for attr in result.get("numericAttributes", []):
-        attributes[attr["key"]] = attr["value"]
+    attrs = {}
+    for attr in item.get("stringAttributes", []):
+        attrs[attr["key"]] = attr["value"]
+    for attr in item.get("numericAttributes", []):
+        attrs[attr["key"]] = attr["value"]
 
     # Decode payload from hex
     payload = {}
-    value_hex = result.get("value", "")
+    value_hex = item.get("value", "")
     if value_hex and value_hex.startswith("0x"):
         try:
             payload_bytes = bytes.fromhex(value_hex[2:])
@@ -261,11 +287,11 @@ def get_entity(entity_key: str) -> str:
         except (ValueError, json.JSONDecodeError):
             pass
 
-    merged = {**attributes, **payload}
+    merged = {**attrs, **payload}
 
     lines = [
         f"Entity Key: {entity_key}",
-        f"Explorer: {EXPLORER_URL}/entity/{entity_key}",
+        f"Ver en Arkiv: https://data.arkiv.network/entity/{entity_key}",
         "",
     ]
 
@@ -283,8 +309,6 @@ def get_entity(entity_key: str) -> str:
         "fechaApertura",
         "criterioAdjudicacion",
         "fuenteUrl",
-        "documentHash",
-        "documentName",
     ]
     labels = {
         "objeto": "Objeto",
@@ -299,8 +323,6 @@ def get_entity(entity_key: str) -> str:
         "fechaApertura": "Fecha de apertura",
         "criterioAdjudicacion": "Criterio de adjudicación",
         "fuenteUrl": "Fuente URL",
-        "documentHash": "Document Hash",
-        "documentName": "Document Name",
     }
 
     for field in field_order:
