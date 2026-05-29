@@ -1,0 +1,16 @@
+[project]
+name = "arkiv-mcp"
+version = "1.0.0"
+description = "MCP server for Arkiv blockchain — query procurement data"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=2.0.0",
+    "httpx>=0.28.0",
+    "python-dotenv>=1.1.0",
+]
+
+[dependency-groups]
+dev = []
+
+[project.scripts]
+arkiv-mcp = "src.server:main"
