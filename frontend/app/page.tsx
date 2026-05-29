@@ -3,21 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { SearchBar } from "@/components/SearchBar";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ChatBot } from "@/components/ChatBot";
 import { RUBROS, ESTADOS, TIPOS_PROCEDIMIENTO } from "@/lib/validacion";
 
-const EXAMPLE_QUERIES = [
-  "Mostrame obras públicas en Salta",
-  "Licitaciones mayores a 100 millones",
-  "Contrataciones adjudicadas este mes",
-  "Obras de plazas y veredas",
-];
+type Mode = "select" | "manual" | "ia";
 
 export default function HomePage() {
   const router = useRouter();
+  const [mode, setMode] = useState<Mode>("select");
+
   const [manualFilters, setManualFilters] = useState({
     rubro: "",
     estado: "",
@@ -27,10 +24,6 @@ export default function HomePage() {
     montoMin: "",
     montoMax: "",
   });
-
-  function handleExampleClick(query: string) {
-    router.push(`/buscar?q=${encodeURIComponent(query)}`);
-  }
 
   function handleManualSearch() {
     const params = new URLSearchParams();
@@ -59,7 +52,6 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero */}
       <main className="mx-auto w-full max-w-3xl px-4 py-8">
         <div className="mb-8 text-center">
           <h2 className="mb-2 text-2xl font-bold text-gray-900 sm:text-3xl">
@@ -70,17 +62,60 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* ── Búsqueda manual ────────────────────────────────── */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
-              </svg>
-              Búsqueda manual
-            </h3>
+        {/* ── Mode selector ────────────────────────────────── */}
+        {mode === "select" && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setMode("manual")}
+              className="group rounded-xl border-2 border-gray-200 bg-white p-8 text-center transition-all hover:border-blue-400 hover:shadow-md"
+            >
+              <div className="mb-3 flex justify-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gray-100 text-2xl group-hover:bg-blue-50">
+                  📋
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Búsqueda manual</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Filtros por rubro, estado, tipo, organismo y monto
+              </p>
+            </button>
 
-            <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setMode("ia")}
+              className="group rounded-xl border-2 border-gray-200 bg-white p-8 text-center transition-all hover:border-blue-400 hover:shadow-md"
+            >
+              <div className="mb-3 flex justify-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gray-100 text-2xl group-hover:bg-blue-50">
+                  🤖
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Preguntale a la IA</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Describí lo que buscás con tus propias palabras
+              </p>
+            </button>
+          </div>
+        )}
+
+        {/* ── Búsqueda manual ───────────────────────────────── */}
+        {mode === "manual" && (
+          <div className="rounded-xl border border-gray-200 bg-white p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                📋 Búsqueda manual
+              </h3>
+              <button
+                type="button"
+                onClick={() => setMode("select")}
+                className="text-xs text-gray-400 underline hover:text-gray-600"
+              >
+                Cambiar modo
+              </button>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
               <Select
                 label="Rubro"
                 placeholder="Todos los rubros"
@@ -109,53 +144,51 @@ export default function HomePage() {
                 onChange={(e) => setFilter("organismo", e.target.value)}
               />
               <Input
+                label="Jurisdicción"
+                placeholder="Ej: Salta"
+                value={manualFilters.jurisdiccion}
+                onChange={(e) => setFilter("jurisdiccion", e.target.value)}
+              />
+              <Input
                 label="Monto mínimo ($)"
                 type="number"
                 placeholder="Ej: 1000000"
                 value={manualFilters.montoMin}
                 onChange={(e) => setFilter("montoMin", e.target.value)}
               />
+              <Input
+                label="Monto máximo ($)"
+                type="number"
+                placeholder="Ej: 50000000"
+                value={manualFilters.montoMax}
+                onChange={(e) => setFilter("montoMax", e.target.value)}
+              />
             </div>
 
-            <Button className="mt-4 w-full" onClick={handleManualSearch}>
+            <Button className="mt-6 w-full" onClick={handleManualSearch}>
               Buscar
             </Button>
           </div>
+        )}
 
-          {/* ── Preguntale a la IA ─────────────────────────────── */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-              </svg>
-              Preguntale a la IA
-            </h3>
-
-            <p className="mb-4 text-xs text-gray-400">
-              Describí lo que buscás con tus propias palabras
-            </p>
-
-            <SearchBar large />
-
-            <div className="mt-4 space-y-2">
-              <p className="text-xs font-medium text-gray-400">
-                Ejemplos:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {EXAMPLE_QUERIES.map((q) => (
-                  <Button
-                    key={q}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleExampleClick(q)}
-                  >
-                    {q}
-                  </Button>
-                ))}
-              </div>
+        {/* ── Chat IA ────────────────────────────────────────── */}
+        {mode === "ia" && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                🤖 Preguntale a la IA
+              </h3>
+              <button
+                type="button"
+                onClick={() => setMode("select")}
+                className="text-xs text-gray-400 underline hover:text-gray-600"
+              >
+                Cambiar modo
+              </button>
             </div>
+            <ChatBot />
           </div>
-        </div>
+        )}
       </main>
 
       {/* Footer */}
