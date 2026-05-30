@@ -14,6 +14,14 @@ Vertical: **Procedencia y auditoría de IA** — LicitaVerify usa [ARKIV] como c
 
 ---
 
+## Demo en Arkiv Explorer
+
+Entidad de licitación registrada en Arkiv Testnet:
+
+👉 [Ver entidad en Arkiv Explorer](https://explorer.braga.hoodi.arkiv.network/entity/0x09b5b2b77a8d19105f662f2fc1bba70bf5ed0ab6119e503d074f454c8bf05f9f)
+
+---
+
 ## Stack Tecnológico
 
 | Capa | Tecnología |
@@ -21,9 +29,10 @@ Vertical: **Procedencia y auditoría de IA** — LicitaVerify usa [ARKIV] como c
 | **Frontend** | Next.js 16 (App Router), React 19, Tailwind CSS v4 |
 | **Capa de datos** | [ARKIV] SDK (`@arkiv-network/sdk@0.6.8`) sobre Arkiv Testnet (Braga) |
 | **IA** | DeepSeek (via OpenAI SDK) — interpretación de lenguaje natural a queries [ARKIV] |
-| **Bot** | Telegram Bot (grammy) para consultas desde móvil |
+| **Bot de Telegram** | grammy + ai-sdk v6 — agente autónomo que consulta [ARKIV] vía MCP |
+| **MCP Server** | Python FastMCP — puente entre el agente de IA y [ARKIV] RPC |
 | **Estilo** | Material Design 3 — tokens de color, tipografía y componentes |
-| **Lenguaje** | TypeScript |
+| **Lenguaje** | TypeScript (frontend + agente), Python (MCP server) |
 
 ---
 
@@ -66,11 +75,57 @@ project:   "licita-verify-v1"       ← PROJECT_ATTRIBUTE (namespace global)
 
 - **`$owner`**: La wallet admin crea y actualiza los pliegos
 - **`$creator`**: Inmutable — atribución verificable del origen del dato
-- **`expiresIn`**: Diferenciado por tipo — los pliegos activos tienen expiración larga; los datos temporales (p. ej. estados de sesión) tienen expiración corta
+- **`expiresIn`**: Diferenciado por tipo — los pliegos activos tienen expiración larga; los datos temporales tienen expiración corta. Refleja lógica de producto real.
 
 ### Resiliencia
 
 Todas las llamadas RPC a [ARKIV] incluyen `withRetry()` con reintentos automáticos ante errores transitorios (`context cancelled`, `timeout`).
+
+---
+
+## Bot de Telegram — Agente Autónomo con MCP
+
+LicitaVerify incluye un **bot de Telegram** que actúa como agente autónomo de IA:
+
+1. El usuario escribe consultas en lenguaje natural en Telegram
+2. El agente (DeepSeek vía ai-sdk v6) interpreta la intención y los filtros
+3. Se conecta al **MCP Server** (Python/FastMCP) que expone `arkiv_search` y `arkiv_get_entity`
+4. El MCP Server ejecuta queries estructurados contra [ARKIV] RPC
+5. El agente devuelve resultados formateados con botones inline para ver detalles
+
+**Arquitectura:**
+
+```
+Usuario (Telegram) → Bot (grammy) → Agente IA (ai-sdk + DeepSeek)
+                                            ↓
+                                    MCP Client (@ai-sdk/mcp)
+                                            ↓
+                                    MCP Server (Python/FastMCP)
+                                            ↓
+                                    Arkiv RPC (Braga testnet)
+```
+
+**Tools del MCP Server:**
+- `arkiv_search`: Buscar licitaciones con filtros (rubro, estado, organismo, jurisdicción, monto)
+- `arkiv_get_entity`: Obtener detalle completo de una licitación por entity key
+
+---
+
+## MCP Server (Python/FastMCP)
+
+Servidor MCP independiente que actúa como puente entre el agente de IA y [ARKIV]:
+
+```bash
+cd arkiv-mcp
+uv run src/server.py
+```
+
+Variables de entorno (`arkiv-mcp/.env`):
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `ARKIV_RPC_URL` | RPC endpoint de Arkiv | `https://braga.hoodi.arkiv.network/rpc` |
+| `ARKIV_EXPLORER_URL` | Explorer URL | `https://explorer.braga.hoodi.arkiv.network` |
 
 ---
 
@@ -81,14 +136,16 @@ Todas las llamadas RPC a [ARKIV] incluyen `withRetry()` con reintentos automáti
 1. **Búsqueda manual** (`/manual`): Filtrado por rubro, organismo, jurisdicción, tipo, estado y rango de presupuesto
 2. **Chat en lenguaje natural** (`/chat`): Interpretación IA de consultas en español, traducción a queries [ARKIV]
 3. **Detalle de licitación** (`/licitacion/[entityKey]`): Vista completa con verificación criptográfica (entity key, bloque, creator)
-4. **Admin** (`/admin/dashboard`): Panel de gestión con creación de nuevas licitaciones
+4. **Bot de Telegram**: Consultas desde móvil en lenguaje natural con respuestas inline y botones de detalle
+5. **Admin** (`/admin/dashboard`): Panel de gestión con creación de nuevas licitaciones en [ARKIV]
 
 ### Manejo de errores
 
-- Retry automático en llamadas [ARKIV]
+- Retry automático en llamadas [ARKIV] (hasta 2 reintentos con backoff)
 - Estados de error visibles (404, 502)
 - Skeleton loading durante consultas
 - Validación de formularios con Zod
+- Mensajes claros de error en el bot de Telegram
 
 ### Abstracción de blockchain
 
@@ -107,17 +164,12 @@ El usuario no necesita saber nada de [ARKIV], wallets ni blockchain para navegar
 
 ---
 
-## Capturas de pantalla
-
-> *(Adjuntar en el video de demo)*
-
----
-
 ## Quick Start
 
 ### Prerrequisitos
 
 - Node.js 18+
+- Python 3.11+ (para MCP server)
 - npm o pnpm
 
 ### Instalación
@@ -127,31 +179,58 @@ El usuario no necesita saber nada de [ARKIV], wallets ni blockchain para navegar
 git clone https://github.com/hallzyx/licita-verify.git
 cd licita-verify
 
-# Instalar dependencias del frontend
+# ── Frontend ──
 cd frontend
 npm install
-
-# Configurar variables de entorno
 cp .env.example .env.local
-# Editar .env.local con:
-#   ARKIV_ADMIN_PRIVATE_KEY=0x...  (wallet admin para escribir)
-#   DEEPSEEK_API_KEY=sk-...         (API key de DeepSeek)
-#   OPENAI_BASE_URL=https://api.deepseek.com (opcional)
-
-# Iniciar en modo desarrollo
+# Editar .env.local con las variables (ver abajo)
 npm run dev
+
+# ── MCP Server (requerido para el bot de Telegram) ──
+cd ../arkiv-mcp
+uv sync
+cp .env.example .env
+# Editar .env con las variables del MCP server
+
+# ── Agente de Telegram ──
+cd ../agent
+npm install
+cp .env.example .env
+# Editar .env con las variables del agente
+npm run agent
 ```
 
-Abrir [http://localhost:3000](http://localhost:3000).
+Abrir [http://localhost:3000](http://localhost:3000) para el frontend.
 
 ### Variables de entorno
 
+**Frontend** (`frontend/.env.local`):
+
 | Variable | Descripción | Obligatoria |
 |----------|-------------|-------------|
+| `ADMIN_PASSWORD` | Password para el panel admin | Sí |
 | `ARKIV_ADMIN_PRIVATE_KEY` | Private key de la wallet admin para escribir entidades | Sí |
-| `DEEPSEEK_API_KEY` | API key para consultas de IA en lenguaje natural | Sí |
-| `OPENAI_BASE_URL` | Base URL del provider de IA (default: `https://api.deepseek.com`) | No |
-| `ARKIV_EXPLORER_URL` | URL del explorer de Arkiv (default: `https://explorer.braga.arkiv.network`) | No |
+| `ARKIV_RPC_URL` | RPC endpoint de Arkiv | No (default: `https://rpc.braga.arkiv.network`) |
+| `ARKIV_EXPLORER_URL` | URL base del explorer (sin `/entity`) | No (default: `https://data.arkiv.network`) |
+| `OPENAI_API_KEY_OCR` | API key de OpenAI para extracción OCR | Sí (para admin) |
+| `DEEPSEEK_API_KEY_LLM` | API key de DeepSeek para búsqueda IA | Sí (para /chat) |
+| `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram | No (solo para bot) |
+
+**MCP Server** (`arkiv-mcp/.env`):
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `ARKIV_RPC_URL` | RPC endpoint de Arkiv | `https://braga.hoodi.arkiv.network/rpc` |
+| `ARKIV_EXPLORER_URL` | Explorer URL | `https://explorer.braga.hoodi.arkiv.network` |
+
+**Agente de Telegram** (`agent/.env`):
+
+| Variable | Descripción | Obligatoria |
+|----------|-------------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Token del bot de @BotFather | Sí |
+| `DEEPSEEK_API_KEY_LLM` | API key de DeepSeek para el agente IA | Sí |
+| `ARKIV_RPC_URL` | RPC endpoint de Arkiv | No (default: `https://rpc.braga.arkiv.network`) |
+| `ARKIV_EXPLORER_URL` | Explorer URL | No (default: `https://data.arkiv.network`) |
 
 ---
 
@@ -162,7 +241,7 @@ licita-verify/
 ├── frontend/                  # App Next.js
 │   ├── app/
 │   │   ├── page.tsx           # Homepage
-│   │   ├── manual/page.tsx    # Búsqueda manual con filtros
+│   │   ├── manual/page.tsx   # Búsqueda manual con filtros
 │   │   ├── chat/page.tsx      # Chat IA en lenguaje natural
 │   │   ├── licitacion/[entityKey]/page.tsx  # Detalle de licitación
 │   │   ├── admin/             # Panel admin (login, dashboard, nueva)
@@ -176,12 +255,22 @@ licita-verify/
 │   │   ├── ChatBot.tsx        # Componente de chat con IA
 │   │   ├── FilterPanel.tsx    # Panel de filtros MD3
 │   │   ├── ResultCard.tsx     # Tarjeta de resultado MD3
-│   │   └── ui/                # Componentes UI (Badge, Button, Input, Select, CopyButton)
-│   └── lib/
-│       ├── arkiv/client.ts    # Cliente [ARKIV] con withRetry
-│       └── ai-search.ts      # Prompt y parser de consultas IA
-├── agent/                     # Bot de Telegram (grammy)
-├── arkiv-mcp/                 # MCP server para [ARKIV]
+│   │   └── ui/               # Componentes UI (Badge, Button, Input, Select, CopyButton)
+│   ├── lib/
+│   │   ├── arkiv/client.ts    # Cliente [ARKIV] con withRetry
+│   │   └── ai-search.ts     # Prompt y parser de consultas IA
+│   └── .env.example           # Variables de entorno del frontend
+├── agent/                     # Bot de Telegram (grammy + ai-sdk v6)
+│   ├── src/
+│   │   ├── index.ts          # Bot entry point, handlers y memoria de sesión
+│   │   ├── agent.ts           # Agente autónomo con DeepSeek
+│   │   ├── mcp-client.ts     # Cliente MCP (@ai-sdk/mcp)
+│   │   └── formatters.ts     # Formateo de respuestas
+│   └── .env.example           # Variables de entorno del agente
+├── arkiv-mcp/                 # MCP Server (Python/FastMCP)
+│   ├── src/server.py          # Tools: arkiv_search, arkiv_get_entity
+│   ├── pyproject.toml
+│   └── .env.example           # Variables de entorno del MCP
 └── docs/                      # Documentación de producto y user flows
 ```
 
