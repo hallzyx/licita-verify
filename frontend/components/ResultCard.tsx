@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
-// ─── Machine → Display mapping ───────────────────────────────────────
+// ─── Machine → Display mapping ────────────────────────────────────────
 
 const ESTADO_DISPLAY: Record<string, string> = {
   convocada: "Convocada",
@@ -21,6 +21,16 @@ const estadoVariant: Record<string, "success" | "warning" | "danger" | "info" | 
   Cancelada: "danger",
   "En ejecución": "info",
   Finalizada: "success",
+};
+
+const ESTADO_ICON: Record<string, string> = {
+  Convocada: "campaign",
+  "En evaluación": "pending_actions",
+  Adjudicada: "check_circle",
+  Desierta: "cancel",
+  Cancelada: "cancel",
+  "En ejecución": "pending_actions",
+  Finalizada: "check_circle",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -62,7 +72,7 @@ interface ResultCardProps {
 }
 
 /**
- * Compact card showing key procurement data for one entity.
+ * MD3-styled card showing key procurement data for one entity.
  */
 export function ResultCard({ entity }: ResultCardProps) {
   const { attributes: attrs, payload, entityKey } = entity;
@@ -78,50 +88,61 @@ export function ResultCard({ entity }: ResultCardProps) {
   const estadoDisplay = ESTADO_DISPLAY[estadoMachine] || estadoMachine;
   const presupuesto = merged.presupuestoOficial;
   const fecha = String(payload?.fechaConvocatoria || attrs.fechaConvocatoria || "");
+  const estadoIcon = ESTADO_ICON[estadoDisplay] || "info";
 
   return (
     <Link
       href={`/licitacion/${entityKey}`}
-      className="block rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+      className="ambient-shadow flex h-full flex-col rounded-xl border border-outline-variant bg-surface-container-lowest p-6 transition-transform duration-300 hover:-translate-y-1"
     >
-      <div className="px-5 py-4">
-        {/* Top row: estado badge + tipo */}
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {estadoDisplay && estadoDisplay !== "-" && (
-            <Badge variant={estadoVariant[estadoDisplay] || "default"}>
-              {estadoDisplay}
-            </Badge>
-          )}
-          {tipoProcedimiento && (
-            <span className="text-xs text-gray-400">{tipoProcedimiento}</span>
-          )}
+      {/* Top row: estado badge + código */}
+      <div className="mb-4 flex items-start justify-between">
+        {estadoDisplay && estadoDisplay !== "-" ? (
+          <span className="flex items-center gap-1 rounded-full bg-secondary-container px-3 py-1 font-label-sm text-label-sm text-on-secondary-container">
+            <span className="material-symbols-outlined text-[14px]">{estadoIcon}</span>
+            {estadoDisplay}
+          </span>
+        ) : tipoProcedimiento ? (
+          <span className="rounded-full border border-outline-variant bg-surface-container-high px-3 py-1 font-label-sm text-label-sm text-primary">
+            {tipoProcedimiento}
+          </span>
+        ) : null}
+        {expediente && (
+          <span className="font-label-sm text-label-sm text-on-surface-variant" title={`Código: ${expediente}`}>
+            {expediente.length > 12 ? expediente.slice(0, 12) + "…" : expediente}
+          </span>
+        )}
+      </div>
+
+      {/* Objeto — title */}
+      <h2 className="font-headline-md text-headline-md mb-2 line-clamp-2 text-primary">
+        {objeto}
+      </h2>
+
+      {/* Description placeholder — organismo */}
+      <p className="font-body-md text-body-md mb-6 flex-grow text-on-surface-variant">
+        {organismo}
+      </p>
+
+      {/* Bottom section */}
+      <div className="mt-auto border-t border-outline-variant pt-4">
+        <div className="mb-4 flex items-center gap-2 text-on-surface-variant">
+          <span className="material-symbols-outlined text-outline">account_balance</span>
+          <span className="font-label-sm text-label-sm">{tipoProcedimiento || "Sin tipo"}</span>
         </div>
 
-        {/* Objeto (bold, main title) */}
-        <h3 className="mb-1 text-sm font-semibold leading-snug text-gray-900 line-clamp-2">
-          {objeto}
-        </h3>
-
-        {/* Organismo + expediente */}
-        <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-          <span>{organismo}</span>
-          {expediente && <span className="font-mono">{expediente}</span>}
-        </div>
-
-        {/* Bottom row: monto + fecha + action */}
-        <div className="flex items-center justify-between border-t border-gray-100 pt-2">
-          <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 font-label-sm text-label-sm">
             {presupuesto != null && (
-              <span className="font-medium text-gray-700">
-                {formatARS(presupuesto)}
-              </span>
+              <span className="font-medium text-primary">{formatARS(presupuesto)}</span>
             )}
             {fecha && fecha !== "-" && (
-              <span className="text-gray-400">{formatDate(fecha)}</span>
+              <span className="text-on-surface-variant">{formatDate(fecha)}</span>
             )}
           </div>
-          <span className="text-xs font-medium text-blue-600 hover:text-blue-800">
-            Ver detalle →
+          <span className="flex items-center gap-1 font-label-sm text-label-sm text-primary transition-colors group-hover:text-surface-tint">
+            Ver Detalle
+            <span className="material-symbols-outlined text-sm">arrow_forward</span>
           </span>
         </div>
       </div>

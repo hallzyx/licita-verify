@@ -1,26 +1,176 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ── MD3 Design Tokens ─────────────────────────────────────── */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Colors — Material Design 3 palette */
+  --color-error-container: #ffdad6;
+  --color-surface-container: #e5eeff;
+  --color-on-tertiary-fixed-variant: #444749;
+  --color-background: #f8f9ff;
+  --color-tertiary: #15191a;
+  --color-tertiary-fixed-dim: #c4c7c9;
+  --color-on-tertiary-fixed: #191c1e;
+  --color-inverse-primary: #adc8f5;
+  --color-inverse-surface: #213145;
+  --color-on-secondary-container: #00714d;
+  --color-primary: #001835;
+  --color-on-background: #0b1c30;
+  --color-on-error-container: #93000a;
+  --color-on-primary-container: #7b95c0;
+  --color-on-secondary: #ffffff;
+  --color-surface-variant: #d3e4fe;
+  --color-on-secondary-fixed-variant: #005236;
+  --color-surface-bright: #f8f9ff;
+  --color-surface-tint: #455f87;
+  --color-on-primary-fixed-variant: #2d476e;
+  --color-outline: #74777f;
+  --color-secondary-fixed-dim: #4edea3;
+  --color-on-tertiary: #ffffff;
+  --color-on-surface: #0b1c30;
+  --color-on-primary: #ffffff;
+  --color-on-primary-fixed: #001b3b;
+  --color-surface-container-lowest: #ffffff;
+  --color-primary-fixed-dim: #adc8f5;
+  --color-on-error: #ffffff;
+  --color-primary-fixed: #d5e3ff;
+  --color-surface: #f8f9ff;
+  --color-surface-container-low: #eff4ff;
+  --color-tertiary-fixed: #e0e3e5;
+  --color-primary-container: #0f2d52;
+  --color-secondary-fixed: #6ffbbe;
+  --color-inverse-on-surface: #eaf1ff;
+  --color-surface-dim: #cbdbf5;
+  --color-on-secondary-fixed: #002113;
+  --color-surface-container-highest: #d3e4fe;
+  --color-surface-container-high: #dce9ff;
+  --color-outline-variant: #c4c6cf;
+  --color-error: #ba1a1a;
+  --color-on-surface-variant: #43474e;
+  --color-secondary-container: #6cf8bb;
+  --color-secondary: #006c49;
+  --color-tertiary-container: #2a2d2f;
+  --color-on-tertiary-container: #919496;
+
+  /* Typography */
+  --font-headline-md: "Hanken Grotesk", sans-serif;
+  --font-body-md: "Inter", sans-serif;
+  --font-body-lg: "Inter", sans-serif;
+  --font-label-sm: "Inter", sans-serif;
+  --font-display-lg: "Hanken Grotesk", sans-serif;
+
+  /* Font sizes with line-height & weight */
+  --font-size-headline-md: 24px;
+  --font-size-body-md: 16px;
+  --font-size-body-lg: 18px;
+  --font-size-label-sm: 12px;
+  --font-size-display-lg: 48px;
+
+  /* Line heights */
+  --leading-headline-md: 32px;
+  --leading-body-md: 24px;
+  --leading-body-lg: 28px;
+  --leading-label-sm: 16px;
+  --leading-display-lg: 56px;
+
+  /* Tracking */
+  --tracking-label-sm: 0.05em;
+  --tracking-display-lg: -0.02em;
+
+  /* Spacing */
+  --spacing-gutter: 24px;
+
+  /* Border radius */
+  --radius-default: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-full: 0.75rem;
+
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Base ──────────────────────────────────────────────────── */
+
+:root {
+  --background: #f8f9ff;
+  --foreground: #0b1c30;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-on-background);
+  font-family: var(--font-body-md);
+}
+
+/* ── Utility classes for typography ─────────────────────────── */
+
+.text-headline-md {
+  font-family: var(--font-headline-md);
+  font-size: var(--font-size-headline-md);
+  line-height: var(--leading-headline-md);
+  font-weight: 600;
+}
+
+.text-body-md {
+  font-family: var(--font-body-md);
+  font-size: var(--font-size-body-md);
+  line-height: var(--leading-body-md);
+  font-weight: 400;
+}
+
+.text-body-lg {
+  font-family: var(--font-body-lg);
+  font-size: var(--font-size-body-lg);
+  line-height: var(--leading-body-lg);
+  font-weight: 400;
+}
+
+.text-label-sm {
+  font-family: var(--font-label-sm);
+  font-size: var(--font-size-label-sm);
+  line-height: var(--leading-label-sm);
+  letter-spacing: var(--tracking-label-sm);
+  font-weight: 600;
+}
+
+.text-display-lg {
+  font-family: var(--font-display-lg);
+  font-size: var(--font-size-display-lg);
+  line-height: var(--leading-display-lg);
+  letter-spacing: var(--tracking-display-lg);
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .text-display-lg {
+    font-size: 32px;
+    line-height: 40px;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ── Material Symbols ───────────────────────────────────────── */
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.icon-fill {
+  font-variation-settings: "FILL" 1;
+}
+
+/* ── Ambient shadow ─────────────────────────────────────────── */
+
+.ambient-shadow {
+  box-shadow: 0 4px 20px rgb(15 45 82 / 0.08);
+}
+
+/* ── Scrollbar hide utility ───────────────────────────────────── */
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

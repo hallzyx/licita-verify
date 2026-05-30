@@ -122,20 +122,22 @@ export function ChatBot() {
   }
 
   return (
-    <div className="flex flex-col rounded-xl border border-gray-200 bg-white">
-      {/* Chat messages */}
-      <div className="flex max-h-96 flex-col gap-4 overflow-y-auto px-5 py-4">
+    <div className="ambient-shadow flex h-[716px] min-h-[600px] flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest">
+      {/* ── Chat History ──────────────────────────────────────── */}
+      <div className="hide-scrollbar flex flex-1 flex-col gap-8 overflow-y-auto p-6 md:p-8 scroll-smooth">
         {messages.map((msg, i) => {
           if (msg.role === "bot" || msg.role === "error") {
             return (
-              <div key={i} className="flex gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm">
-                  🤖
+              <div key={i} className="flex items-start gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container">
+                  <span className="material-symbols-outlined text-primary">robot_2</span>
                 </div>
-                <div>
-                  <p className={`text-sm ${msg.role === "error" ? "text-red-600" : "text-gray-700"}`}>
-                    {msg.text}
-                  </p>
+                <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-surface-container-low p-4 font-body-md text-on-surface">
+                  {msg.role === "error" ? (
+                    <p className="text-on-error-container">{msg.text}</p>
+                  ) : (
+                    <p>{msg.text}</p>
+                  )}
                 </div>
               </div>
             );
@@ -143,9 +145,9 @@ export function ChatBot() {
 
           if (msg.role === "user") {
             return (
-              <div key={i} className="flex justify-end gap-3">
-                <div className="rounded-xl bg-blue-600 px-4 py-2">
-                  <p className="text-sm text-white">{msg.text}</p>
+              <div key={i} className="flex items-start gap-4 justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary p-4 font-body-md text-on-primary shadow-sm">
+                  {msg.text}
                 </div>
               </div>
             );
@@ -154,13 +156,13 @@ export function ChatBot() {
           if (msg.role === "results") {
             const count = msg.results.length;
             return (
-              <div key={i} className="flex gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm">
-                  🤖
+              <div key={i} className="flex w-full max-w-[85%] flex-col gap-3 items-start gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container">
+                  <span className="material-symbols-outlined text-primary">robot_2</span>
                 </div>
-                <div className="min-w-0 flex-1 space-y-3">
-                  <p className="text-sm text-gray-700">
-                    Encontré <strong>{count} resultado{count !== 1 ? "s" : ""}</strong>:
+                <div className="flex flex-col gap-3 w-full">
+                  <p className="font-body-md text-on-surface">
+                    Encontré <span className="font-bold">{count} resultado{count !== 1 ? "s" : ""}</span>:
                   </p>
                   <FilterChips filters={msg.filters} />
                   <div className="space-y-2">
@@ -179,19 +181,19 @@ export function ChatBot() {
 
           if (msg.role === "ambiguous") {
             return (
-              <div key={i} className="flex gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm">
-                  🤖
+              <div key={i} className="flex items-start gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container">
+                  <span className="material-symbols-outlined text-primary">robot_2</span>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-700">{msg.ambiguous.clarification}</p>
+                  <p className="font-body-md text-on-surface">{msg.ambiguous.clarification}</p>
                   <div className="flex flex-wrap gap-2">
                     {msg.ambiguous.suggestions.map((s, j) => (
                       <button
                         key={j}
                         type="button"
                         onClick={() => handleSuggestion(s)}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 transition-colors hover:border-blue-300 hover:text-blue-700"
+                        className="rounded-full border border-outline-variant px-3 py-1.5 font-label-sm text-label-sm text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
                       >
                         {s}
                       </button>
@@ -206,14 +208,14 @@ export function ChatBot() {
         })}
 
         {loading && (
-          <div className="flex gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm">
-              🤖
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container">
+              <span className="material-symbols-outlined animate-pulse text-primary">robot_2</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <div className="h-2 w-2 animate-bounce rounded-full bg-blue-400" />
-              <div className="h-2 w-2 animate-bounce rounded-full bg-blue-400" style={{ animationDelay: "0.2s" }} />
-              <div className="h-2 w-2 animate-bounce rounded-full bg-blue-400" style={{ animationDelay: "0.4s" }} />
+            <div className="flex h-[56px] items-center gap-1 rounded-2xl rounded-tl-sm bg-surface-container-low p-4">
+              <span className="h-2 w-2 animate-bounce rounded-full bg-on-surface-variant" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-on-surface-variant [animation-delay:200ms]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-on-surface-variant [animation-delay:400ms]" />
             </div>
           </div>
         )}
@@ -221,39 +223,42 @@ export function ChatBot() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="border-t border-gray-100 px-4 py-3">
-        <div className="flex gap-2">
+      {/* ── Input Area ─────────────────────────────────────────── */}
+      <div className="z-10 border-t border-outline-variant bg-surface-container-lowest p-4 md:p-6">
+        <form
+          className="relative flex items-center gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend(input);
+          }}
+        >
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSend(input);
-            }}
             placeholder="Escribí tu consulta..."
-            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm transition-colors placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
             disabled={loading}
+            className="w-full rounded-lg border border-outline-variant bg-surface-bright px-4 py-3 font-body-md text-on-surface transition-all placeholder:text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
           />
           <button
-            type="button"
-            onClick={() => handleSend(input)}
+            type="submit"
             disabled={loading || !input.trim()}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+            className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-fixed px-6 font-label-sm text-on-primary-fixed transition-colors hover:bg-primary-fixed-dim disabled:opacity-50"
           >
-            Enviar
+            <span>Enviar</span>
+            <span className="material-symbols-outlined text-[18px]">send</span>
           </button>
-        </div>
+        </form>
 
-        {/* Example queries as chips */}
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        {/* Quick Prompts */}
+        <div className="mt-4 flex flex-wrap gap-2">
           {EXAMPLE_QUERIES.map((q) => (
             <button
               key={q}
               type="button"
               onClick={() => handleSend(q)}
               disabled={loading}
-              className="rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 transition-colors hover:border-blue-300 hover:text-blue-700 disabled:opacity-50"
+              className="whitespace-nowrap rounded-full border border-outline-variant px-3 py-1.5 font-label-sm text-[12px] text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary disabled:opacity-50"
             >
               {q}
             </button>

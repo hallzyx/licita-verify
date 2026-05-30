@@ -69,35 +69,30 @@ export function FilterPanel() {
   const hasActiveFilters = Object.values(filters).some((v) => v.trim());
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white">
+    <div>
+      {/* Filter toggle header */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        className="flex w-full items-center justify-between px-4 py-3 font-body-md text-body-md text-primary transition-colors hover:bg-surface-container-low"
       >
         <span className="flex items-center gap-2">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
-          </svg>
+          <span className="material-symbols-outlined">tune</span>
           Filtros
           {hasActiveFilters && (
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-700">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-secondary-container font-label-sm text-label-sm text-on-secondary-container">
               {Object.values(filters).filter((v) => v.trim()).length}
             </span>
           )}
         </span>
-        <svg
-          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <span className={`material-symbols-outlined transition-transform ${open ? "rotate-180" : ""}`}>
+          expand_more
+        </span>
       </button>
 
+      {/* Expanded filter fields */}
       {open && (
-        <div className="border-t border-gray-100 px-4 py-4">
+        <div className="border-t border-outline-variant px-4 py-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Select
               label="Rubro"

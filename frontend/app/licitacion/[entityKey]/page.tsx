@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { getPublicClient } from "@/lib/arkiv/client";
+import { getPublicClient, withRetry } from "@/lib/arkiv/client";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { CopyValue } from "@/components/ui/CopyValue";
+import { CopyButton } from "@/components/ui/CopyButton";
 
 export const dynamic = "force-dynamic";
 
@@ -54,25 +54,37 @@ function formatARS(amount: unknown): string {
   }).format(num);
 }
 
-function SummaryRow({
+function formatDate(value: unknown): string {
+  if (value == null || value === "") return "";
+  const d = new Date(value as string | number);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// ─── Data Row Component ───────────────────────────────────────────────
+
+function DataRow({
   label,
-  value,
-  isDate,
+  children,
 }: {
   label: string;
-  value: unknown;
-  isDate?: boolean;
+  children: React.ReactNode;
 }) {
-  if (value == null || value === "") return null;
   return (
-    <div className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4">
-      <dt className="min-w-48 text-sm font-medium text-gray-500">{label}</dt>
-      <dd className="text-sm text-gray-900">
-        {isDate
-          ? new Date(value as string | number).toLocaleString("es-AR")
-          : String(value)}
-      </dd>
-    </div>
+    <tr className="border-b border-outline-variant last:border-b-0 hover:bg-surface-container/50 transition-colors">
+      <th className="w-1/3 p-4 align-top font-label-sm text-label-sm uppercase text-on-surface-variant">
+        {label}
+      </th>
+      <td className="p-4 font-body-md text-body-md text-on-surface">
+        {children}
+      </td>
+    </tr>
   );
 }
 
@@ -96,7 +108,9 @@ export default async function PublicLicitacionDetailPage({
 
   try {
     const publicClient = getPublicClient();
-    const entity = await publicClient.getEntity(entityKey as `0x${string}`);
+    const entity = await withRetry(() =>
+      publicClient.getEntity(entityKey as `0x${string}`),
+    );
 
     entityData = {
       key: entity.key,
@@ -132,34 +146,40 @@ export default async function PublicLicitacionDetailPage({
 
   if (error === "not_found") {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="border-b border-gray-200 bg-white">
-          <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
-            <Link href="/" className="text-xl font-bold text-gray-900">
-              LicitaVerify
+      <div className="flex min-h-screen flex-col bg-background text-on-background">
+        <nav className="sticky top-0 z-50 w-full border-b border-outline-variant bg-surface-container-lowest">
+          <div className="container flex h-16 items-center justify-between px-4 md:px-16">
+            <Link href="/" className="flex items-center gap-2">
+              <span className="material-symbols-outlined icon-fill text-2xl text-primary" aria-hidden="true">
+                verified_user
+              </span>
+              <span className="font-headline-md text-headline-md font-bold text-primary">
+                LicitaVerify
+              </span>
             </Link>
             <Link
               href="/admin/login"
-              className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
+              className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors"
             >
               Admin
             </Link>
           </div>
-        </header>
-        <main className="mx-auto max-w-3xl px-4 py-8">
-          <Card title="No encontrada">
-            <p className="text-gray-500">
-              La licitación que buscás no existe o no está disponible.
-            </p>
-            <div className="mt-4">
-              <Link
-                href="/"
-                className="text-sm font-medium text-blue-600 hover:text-blue-800"
-              >
-                ← Volver al inicio
-              </Link>
-            </div>
-          </Card>
+        </nav>
+        <main className="container mx-auto flex flex-1 flex-col items-center justify-center px-4 py-16">
+          <span className="material-symbols-outlined mb-4 text-5xl text-on-surface-variant">search_off</span>
+          <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary mb-2">
+            No encontrada
+          </h1>
+          <p className="font-body-md text-body-md text-on-surface-variant mb-8 text-center">
+            La licitación que buscás no existe o no está disponible.
+          </p>
+          <Link
+            href="/manual"
+            className="flex items-center gap-2 rounded bg-primary px-6 py-3 font-label-sm text-label-sm text-on-primary hover:opacity-90 transition-opacity"
+          >
+            <span className="material-symbols-outlined text-[18px]">search</span>
+            Buscar licitaciones
+          </Link>
         </main>
       </div>
     );
@@ -169,32 +189,34 @@ export default async function PublicLicitacionDetailPage({
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="border-b border-gray-200 bg-white">
-          <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
-            <Link href="/" className="text-xl font-bold text-gray-900">
-              LicitaVerify
-            </Link>
-            <Link
-              href="/admin/login"
-              className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              Admin
+      <div className="flex min-h-screen flex-col bg-background text-on-background">
+        <nav className="sticky top-0 z-50 w-full border-b border-outline-variant bg-surface-container-lowest">
+          <div className="container flex h-16 items-center justify-between px-4 md:px-16">
+            <Link href="/" className="flex items-center gap-2">
+              <span className="material-symbols-outlined icon-fill text-2xl text-primary" aria-hidden="true">
+                verified_user
+              </span>
+              <span className="font-headline-md text-headline-md font-bold text-primary">
+                LicitaVerify
+              </span>
             </Link>
           </div>
-        </header>
-        <main className="mx-auto max-w-3xl px-4 py-8">
-          <Card title="Error">
-            <p className="text-red-600">{error}</p>
-            <div className="mt-4">
-              <Link
-                href="/"
-                className="text-sm font-medium text-blue-600 hover:text-blue-800"
-              >
-                ← Volver al inicio
-              </Link>
-            </div>
-          </Card>
+        </nav>
+        <main className="container mx-auto flex flex-1 flex-col items-center justify-center px-4 py-16">
+          <span className="material-symbols-outlined mb-4 text-5xl text-error">error</span>
+          <h1 className="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-primary mb-2">
+            Error al cargar
+          </h1>
+          <p className="font-body-md text-body-md text-on-surface-variant mb-8 max-w-md text-center">
+            {error}
+          </p>
+          <Link
+            href="/manual"
+            className="flex items-center gap-2 rounded bg-primary px-6 py-3 font-label-sm text-label-sm text-on-primary hover:opacity-90 transition-opacity"
+          >
+            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            Volver a búsqueda
+          </Link>
         </main>
       </div>
     );
@@ -206,198 +228,279 @@ export default async function PublicLicitacionDetailPage({
 
   const estadoMachine = String(mergedData.estado || "");
   const estadoDisplay = ESTADO_DISPLAY[estadoMachine] || estadoMachine;
-  const documentHash = mergedData.documentHash
-    ? String(mergedData.documentHash)
-    : null;
+  const objeto = mergedData.objeto
+    ? String(mergedData.objeto)
+    : `Licitación: ${mergedData.expediente || entityKey}`;
 
-  const fields: { label: string; value: unknown; isDate?: boolean }[] = [
-    { label: "Expediente", value: mergedData.expediente },
-    { label: "Organismo contratante", value: mergedData.organismo },
-    { label: "Jurisdicción", value: mergedData.jurisdiccion },
-    { label: "Tipo de procedimiento", value: mergedData.tipoProcedimiento },
-    { label: "Rubro", value: mergedData.rubro },
-    { label: "Estado", value: mergedData.estado },
-    { label: "Objeto de contratación", value: mergedData.objeto },
+  // Primary fields shown in the table
+  type FieldDef = { label: string; value: string; badge?: boolean; isDate?: boolean; isUrl?: boolean };
+  const primaryFields: FieldDef[] = [
+    { label: "Expediente", value: String(mergedData.expediente ?? "") },
+    { label: "Organismo contratante", value: String(mergedData.organismo ?? "") },
+    { label: "Jurisdicción", value: String(mergedData.jurisdiccion ?? "") },
+    { label: "Tipo de procedimiento", value: String(mergedData.tipoProcedimiento ?? "") },
+    { label: "Rubro", value: String(mergedData.rubro ?? "") },
+    { label: "Estado", value: estadoDisplay, badge: true },
     {
       label: "Fecha de convocatoria",
-      value: mergedData.fechaConvocatoria,
+      value: mergedData.fechaConvocatoria ? formatDate(mergedData.fechaConvocatoria) : "",
       isDate: true,
     },
     {
       label: "Fecha de apertura",
-      value: mergedData.fechaApertura,
+      value: mergedData.fechaApertura ? formatDate(mergedData.fechaApertura) : "",
       isDate: true,
     },
-    { label: "Presupuesto oficial", value: formatARS(mergedData.presupuestoOficial) },
-    { label: "Criterio de adjudicación", value: mergedData.criterioAdjudicacion },
-    { label: "Proveedor adjudicado", value: mergedData.proveedorAdjudicado },
-    { label: "Fuente oficial URL", value: mergedData.fuenteUrl },
-  ];
+    {
+      label: "Presupuesto oficial",
+      value: mergedData.presupuestoOficial ? formatARS(mergedData.presupuestoOficial) : "",
+    },
+    { label: "Criterio de adjudicación", value: String(mergedData.criterioAdjudicacion ?? "") },
+    { label: "Proveedor adjudicado", value: String(mergedData.proveedorAdjudicado ?? "") },
+    {
+      label: "Fuente oficial URL",
+      value: String(mergedData.fuenteUrl ?? ""),
+      isUrl: true,
+    },
+  ].filter((f) => f.value !== "");
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
-          <Link href="/" className="text-xl font-bold text-gray-900">
-            LicitaVerify
-          </Link>
-          <Link
-            href="/admin/login"
-            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            Admin
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        {/* Back link */}
-        <div className="mb-6">
-          <Link
-            href="/buscar"
-            className="text-sm font-medium text-blue-600 hover:text-blue-800"
-          >
-            ← Volver a resultados
-          </Link>
-        </div>
-
-        {/* Summary card */}
-        <Card title="Licitación">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap gap-2">
-              {estadoDisplay && (
-                <Badge variant={estadoVariant[estadoDisplay] || "default"}>
-                  {estadoDisplay}
-                </Badge>
-              )}
-            </div>
-
-            <dl className="divide-y divide-gray-100">
-              <SummaryRow label="Expediente" value={mergedData.expediente} />
-              <SummaryRow
-                label="Organismo contratante"
-                value={mergedData.organismo}
-              />
-              <SummaryRow
-                label="Tipo de procedimiento"
-                value={mergedData.tipoProcedimiento}
-              />
-              <SummaryRow label="Rubro" value={mergedData.rubro} />
-              <SummaryRow label="Estado" value={mergedData.estado} />
-              <SummaryRow
-                label="Fecha de convocatoria"
-                value={mergedData.fechaConvocatoria}
-                isDate
-              />
-              <SummaryRow
-                label="Fecha de apertura"
-                value={mergedData.fechaApertura}
-                isDate
-              />
-            </dl>
-
-            {/* Explorer link */}
-            <div className="rounded-lg bg-gray-50 p-3">
-              <a
-                href={`${EXPLORER_BASE_URL}/${entityKey}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800"
+    <div className="flex min-h-screen flex-col bg-background text-on-background font-body-md text-body-md">
+      {/* ── TopNavBar ──────────────────────────────────────────── */}
+      <nav className="sticky top-0 z-50 w-full border-b border-outline-variant bg-surface-container-lowest">
+        <div className="container flex h-16 items-center justify-between px-4 md:px-16">
+          <div className="flex items-center gap-8">
+            <Link href="/" className="flex items-center gap-2">
+              <span className="material-symbols-outlined icon-fill text-2xl text-primary" aria-hidden="true">
+                verified_user
+              </span>
+              <span className="font-headline-md text-headline-md font-bold text-primary">
+                LicitaVerify
+              </span>
+            </Link>
+            <nav className="hidden items-center gap-6 md:flex">
+              <Link
+                href="/"
+                className="font-body-md text-body-md text-on-surface-variant transition-colors duration-200 hover:text-primary"
               >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                  />
-                </svg>
-                Ver en Arkiv Explorer
+                Inicio
+              </Link>
+              <Link
+                href="/manual"
+                className="font-body-md text-body-md text-on-surface-variant transition-colors duration-200 hover:text-primary"
+              >
+                Búsqueda
+              </Link>
+              <Link
+                href="/chat"
+                className="font-body-md text-body-md text-on-surface-variant transition-colors duration-200 hover:text-primary"
+              >
+                Chat IA
+              </Link>
+              <a
+                href="#transparencia"
+                className="font-body-md text-body-md text-on-surface-variant transition-colors duration-200 hover:text-primary"
+              >
+                Transparencia
               </a>
-            </div>
+            </nav>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/admin/login"
+              className="hidden items-center justify-center gap-2 rounded-full bg-primary px-6 py-2 font-label-sm text-label-sm text-on-primary hover:opacity-90 transition-opacity md:flex"
+            >
+              Acceder
+            </Link>
+            <button className="text-primary md:hidden" aria-label="Menú">
+              <span className="material-symbols-outlined">menu</span>
+            </button>
+          </div>
+        </div>
+      </nav>
 
-            {/* Document hash */}
-            {documentHash && (
-              <div className="rounded-lg bg-gray-50 p-3">
-                <p className="mb-1 text-xs font-medium text-gray-500">
-                  Hash del documento
-                </p>
-                <CopyValue value={documentHash} />
-              </div>
+      {/* ── Main Content ────────────────────────────────────────── */}
+      <main className="container mx-auto flex flex-1 flex-col gap-12 px-4 py-12 md:px-16">
+        {/* Breadcrumbs */}
+        <div className="flex items-center gap-2 font-label-sm text-label-sm text-on-surface-variant">
+          <Link
+            href="/manual"
+            className="flex items-center gap-1 transition-colors hover:text-primary"
+          >
+            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+            Volver a resultados
+          </Link>
+        </div>
+
+        {/* Title & Status */}
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <h1 className="max-w-4xl font-display-lg-mobile text-display-lg-mobile md:font-display-lg md:text-display-lg text-primary">
+            {objeto}
+          </h1>
+          <div className="flex-shrink-0 pt-2">
+            {estadoDisplay && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-high px-3 py-1.5 font-label-sm text-label-sm text-primary">
+                <span className="h-2 w-2 rounded-full bg-secondary" />
+                {estadoDisplay}
+              </span>
             )}
           </div>
-        </Card>
+        </div>
 
-        {/* Full data */}
-        <Card title="Datos completos" className="mt-4">
-          <dl className="divide-y divide-gray-100">
-            {fields
-              .filter((f) => f.value != null && f.value !== "")
-              .map((field) => (
-                <div
-                  key={field.label}
-                  className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4"
-                >
-                  <dt className="min-w-48 text-sm font-medium text-gray-500">
-                    {field.label}
-                  </dt>
-                  <dd className="text-sm text-gray-900">
-                    {field.label === "Fuente oficial URL" ? (
+        {/* Main Layout Grid */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Left Column: Data Table (8 cols) */}
+          <div className="flex flex-col gap-8 lg:col-span-8">
+            {/* Data Card */}
+            <div className="ambient-shadow overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest">
+              <div className="border-b border-outline-variant bg-surface-container-low p-6">
+                <h2 className="font-headline-md text-headline-md text-primary">
+                  Detalles del Expediente
+                </h2>
+              </div>
+              <div className="p-0">
+                <table className="w-full text-left border-collapse">
+                  <tbody>
+                    {primaryFields.map((field) => (
+                      <DataRow key={field.label} label={field.label}>
+                        {field.badge ? (
+                          <Badge variant={estadoVariant[estadoDisplay] || "default"}>
+                            {field.value}
+                          </Badge>
+                        ) : field.isUrl ? (
+                          <a
+                            href={field.value}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary underline hover:opacity-80 transition-opacity"
+                          >
+                            {field.value}
+                          </a>
+                        ) : (
+                          field.value
+                        )}
+                      </DataRow>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Verification & Actions (4 cols) */}
+          <div className="flex flex-col gap-6 lg:col-span-4">
+            {/* Verificabilidad Card */}
+            <div className="ambient-shadow rounded-xl border-b border-r border-t border-outline-variant border-l-4 border-l-secondary bg-surface-container-lowest p-6">
+              <div className="mb-6 flex items-center gap-3">
+                <span className="material-symbols-outlined text-secondary text-[28px]">verified_user</span>
+                <h3 className="font-headline-md text-headline-md text-primary">
+                  Verificabilidad
+                </h3>
+              </div>
+              <p className="mb-6 font-label-sm text-label-sm leading-relaxed text-on-surface-variant">
+                Este registro está anclado criptográficamente. Los datos mostrados coinciden exactamente con la fuente original inmutable.
+              </p>
+
+              <div className="flex flex-col gap-4">
+                {/* Entity Key */}
+                {entityData?.key ? (
+                  <div className="flex flex-col gap-1 rounded bg-surface-container p-3">
+                    <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                      Entity Key
+                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="max-w-[85%] truncate font-mono font-body-md text-body-md text-primary">
+                        {entityData.key.length > 14
+                          ? `${entityData.key.slice(0, 6)}...${entityData.key.slice(-4)}`
+                          : entityData.key}
+                      </span>
+                      <CopyButton value={entityData.key} />
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Creado en bloque */}
+                {entityData?.createdAtBlock ? (
+                  <div className="flex flex-col gap-1 rounded bg-surface-container p-3">
+                    <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                      Creado en bloque
+                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-body-md text-body-md text-primary">
+                        #{entityData.createdAtBlock}
+                      </span>
                       <a
-                        href={String(field.value)}
+                        href={`${EXPLORER_BASE_URL}/${entityKey}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 underline hover:text-blue-800"
+                        className="text-on-surface-variant transition-colors hover:text-primary"
+                        title="Ver bloque"
                       >
-                        {String(field.value)}
+                        <span className="material-symbols-outlined text-[18px]">open_in_new</span>
                       </a>
-                    ) : (
-                      String(field.value)
-                    )}
-                  </dd>
-                </div>
-              ))}
-          </dl>
-        </Card>
+                    </div>
+                  </div>
+                ) : null}
 
-        {/* Entity metadata */}
-        <Card title="Verificabilidad" className="mt-4">
-          <div className="space-y-3">
-            {entityData?.key && (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-gray-500">
-                  Entity Key
-                </span>
-                <CopyValue value={entityData.key} />
+                {/* Creator */}
+                {entityData?.creator ? (
+                  <div className="flex flex-col gap-1 rounded bg-surface-container p-3">
+                    <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                      Creator
+                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="max-w-[85%] truncate font-mono font-body-md text-body-md text-primary">
+                        {entityData.creator.length > 14
+                          ? `${entityData.creator.slice(0, 6)}...${entityData.creator.slice(-4)}`
+                          : entityData.creator}
+                      </span>
+                      <CopyButton value={entityData.creator} />
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Document Hash */}
+                {mergedData.documentHash != null && String(mergedData.documentHash) !== "" ? (
+                  <div className="flex flex-col gap-1 rounded bg-surface-container p-3">
+                    <span className="font-label-sm text-label-sm uppercase text-on-surface-variant">
+                      Document Hash
+                    </span>
+                    <CopyValue value={String(mergedData.documentHash)} />
+                  </div>
+                ) : null}
               </div>
-            )}
-            {entityData?.createdAtBlock && (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-gray-500">
-                  Creado en bloque
-                </span>
-                <span className="font-mono text-xs text-gray-700">
-                  {entityData.createdAtBlock}
-                </span>
+
+              {/* Explorer Link */}
+              <div className="mt-8">
+                <a
+                  href={`${EXPLORER_BASE_URL}/${entityKey}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex w-full items-center justify-center gap-2 rounded bg-primary px-4 py-3 font-label-sm text-label-sm text-on-primary shadow-sm transition-colors hover:bg-primary-container"
+                >
+                  <span className="material-symbols-outlined text-[18px]">explore</span>
+                  Ver en Arkiv Explorer
+                </a>
               </div>
-            )}
-            {entityData?.creator && (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-gray-500">
-                  Creator
-                </span>
-                <CopyValue value={entityData.creator} />
-              </div>
-            )}
+            </div>
           </div>
-        </Card>
+        </div>
       </main>
+
+      {/* ── Footer ──────────────────────────────────────────────── */}
+      <footer className="mt-auto border-t border-outline-variant bg-surface-container">
+        <div className="container flex flex-col items-center justify-between gap-6 px-4 py-12 md:flex-row md:px-16 md:text-left">
+          <p className="font-body-md text-body-md text-center text-on-surface-variant md:text-left">
+            © {new Date().getFullYear()} LicitaVerify. Portal de Transparencia Ciudadana.
+          </p>
+          <nav className="flex flex-wrap justify-center gap-6">
+            <a href="#" className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-primary hover:underline">Privacidad</a>
+            <a href="#" className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-primary hover:underline">Términos</a>
+            <a href="#" className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-primary hover:underline">Contacto</a>
+            <a href="#" className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-primary hover:underline">Ayuda</a>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }

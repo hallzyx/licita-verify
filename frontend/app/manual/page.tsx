@@ -80,87 +80,149 @@ function ManualContent() {
     doSearch();
   }, [doSearch]);
 
-  const hasAnyFilter = filterParamKeys.some((k) => searchParams.get(k));
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <Link href="/" className="text-xl font-bold text-gray-900">
-            LicitaVerify
+    <div className="flex min-h-screen flex-col bg-background text-on-background">
+      {/* ── TopNavBar ──────────────────────────────────────────── */}
+      <nav className="sticky top-0 z-50 w-full border-b border-outline-variant bg-surface-container-lowest">
+        <div className="container flex h-16 items-center justify-between px-4 md:px-16">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="material-symbols-outlined icon-fill text-3xl text-primary" aria-hidden="true">
+              verified_user
+            </span>
+            <span className="font-headline-md text-headline-md font-bold text-primary">
+              LicitaVerify
+            </span>
           </Link>
-          <Link
-            href="/admin/login"
-            className="text-xs font-medium text-gray-400 transition-colors hover:text-gray-600"
-          >
-            Admin
-          </Link>
-        </div>
-      </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-6">
-        <div className="mb-6">
+          <div className="hidden items-center gap-8 md:flex">
+            <Link href="/" className="font-body-md text-body-md text-on-surface-variant transition-colors duration-200 hover:text-primary">
+              Inicio
+            </Link>
+            <Link href="/manual" className="border-b-2 border-primary pb-1 font-bold font-body-md text-body-md text-primary">
+              Búsqueda
+            </Link>
+            <Link href="/chat" className="font-body-md text-body-md text-on-surface-variant transition-colors duration-200 hover:text-primary">
+              Chat IA
+            </Link>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <Link
+              href="/admin/login"
+              className="hidden items-center gap-2 rounded-full bg-primary px-6 py-2 font-label-sm text-label-sm text-on-primary transition-opacity hover:opacity-90 md:flex"
+            >
+              Acceder
+            </Link>
+            <button className="text-on-surface-variant md:hidden" aria-label="Menú">
+              <span className="material-symbols-outlined">menu</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* ── Main Content ────────────────────────────────────────── */}
+      <main className="container flex-grow px-4 py-12 md:px-16">
+        {/* Header & Description */}
+        <div className="mb-10 text-center md:text-left">
+          <h1 className="text-display-lg font-display-lg mb-4 text-primary">
+            Transparencia a tu alcance
+          </h1>
+          <p className="text-body-lg font-body-lg max-w-3xl text-on-surface-variant">
+            Explora las licitaciones públicas de forma sencilla. Filtrá por estado, rubro, organismo y más para encontrar la información que necesitás.
+          </p>
+        </div>
+
+        {/* Filter Bar */}
+        <div className="ambient-shadow mb-12 rounded-xl border border-outline-variant bg-surface-container-lowest p-4">
           <FilterPanel />
         </div>
 
+        {/* Content states */}
         {state.status === "idle" && (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-white py-16 text-center">
-            <p className="text-gray-500">
-              Seleccioná filtros y presioná "Aplicar filtros" para buscar
+          <div className="rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest py-16 text-center">
+            <span className="material-symbols-outlined mb-4 text-5xl text-outline">filter_list</span>
+            <p className="font-body-md text-body-md text-on-surface-variant">
+              Seleccioná filtros y presioná &quot;Aplicar filtros&quot; para buscar
             </p>
           </div>
         )}
 
         {state.status === "loading" && (
-          <div className="space-y-4">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse rounded-xl border border-gray-200 bg-white p-5">
-                <div className="mb-3 h-4 w-24 rounded bg-gray-200" />
-                <div className="mb-2 h-5 w-3/4 rounded bg-gray-200" />
-                <div className="mb-2 h-4 w-1/2 rounded bg-gray-200" />
-                <div className="h-4 w-1/3 rounded bg-gray-200" />
+              <div key={i} className="ambient-shadow animate-pulse rounded-xl border border-outline-variant bg-surface-container-lowest p-6">
+                <div className="mb-4 h-4 w-24 rounded bg-surface-container-high" />
+                <div className="mb-2 h-5 w-3/4 rounded bg-surface-container-high" />
+                <div className="mb-2 h-4 w-1/2 rounded bg-surface-container-high" />
+                <div className="h-4 w-1/3 rounded bg-surface-container-high" />
               </div>
             ))}
           </div>
         )}
 
         {state.status === "error" && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-medium text-red-700">{state.message}</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => doSearch()}>
-              Reintentar
-            </Button>
+          <div className="rounded-xl border border-red-200 bg-error-container p-6">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-on-error-container">error</span>
+              <div>
+                <p className="font-body-md text-body-md text-on-error-container">{state.message}</p>
+                <Button variant="outline" size="sm" className="mt-3" onClick={() => doSearch()}>
+                  Reintentar
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
         {state.status === "results" && (
           <>
             {state.results.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-300 bg-white py-16 text-center">
-                <p className="text-gray-500">No se encontraron resultados</p>
-                <p className="mt-2 text-xs text-gray-400">
+              <div className="rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest py-16 text-center">
+                <span className="material-symbols-outlined mb-4 text-5xl text-outline">search_off</span>
+                <p className="font-body-md text-body-md text-on-surface-variant">
+                  No se encontraron resultados
+                </p>
+                <p className="mt-2 font-label-sm text-label-sm text-outline">
                   Probá ampliar los filtros
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-400">
+              <>
+                <p className="font-label-sm text-label-sm text-on-surface-variant">
                   {state.total} resultado{state.total !== 1 ? "s" : ""}
                 </p>
-                {state.results.map((entity) => (
-                  <ResultCard key={entity.entityKey} entity={entity} />
-                ))}
-              </div>
+                <div className="mt-4 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {state.results.map((entity) => (
+                    <ResultCard key={entity.entityKey} entity={entity} />
+                  ))}
+                </div>
+              </>
             )}
           </>
         )}
-
-        <div className="mt-8 text-center">
-          <Link href="/" className="text-xs font-medium text-gray-400 transition-colors hover:text-gray-600">
-            ← Volver al inicio
-          </Link>
-        </div>
       </main>
+
+      {/* ── Footer ──────────────────────────────────────────────── */}
+      <footer className="mt-auto border-t border-outline-variant bg-surface-container">
+        <div className="container flex flex-col items-center justify-between gap-6 px-4 py-12 md:flex-row md:px-16 md:text-left">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="material-symbols-outlined icon-fill text-2xl text-primary" aria-hidden="true">verified_user</span>
+              <span className="font-headline-md text-headline-md font-bold text-primary">LicitaVerify</span>
+            </div>
+            <div className="font-body-md text-body-md text-on-surface-variant">
+              © {new Date().getFullYear()} LicitaVerify. Portal de Transparencia Ciudadana.
+            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-6">
+            <a href="#" className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-primary hover:underline">Privacidad</a>
+            <a href="#" className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-primary hover:underline">Términos</a>
+            <a href="#" className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-primary hover:underline">Contacto</a>
+            <a href="#" className="font-label-sm text-label-sm text-on-surface-variant transition-colors hover:text-primary hover:underline">Ayuda</a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -171,8 +233,8 @@ export default function ManualPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600" />
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-surface-container-high border-t-primary" />
         </div>
       }
     >
