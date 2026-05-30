@@ -1,0 +1,42 @@
+services:
+  # ── Frontend: Next.js app ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: licitaverify-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - ARKIV_ADMIN_PRIVATE_KEY=${ARKIV_ADMIN_PRIVATE_KEY:?error}
+      - ARKIV_RPC_URL=${ARKIV_RPC_URL:-https://rpc.braga.arkiv.network}
+      - ARKIV_EXPLORER_URL=${ARKIV_EXPLORER_URL:-https://data.arkiv.network}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?error}
+      - DEEPSEEK_API_KEY_LLM=${DEEPSEEK_API_KEY_LLM:?error}
+      - OPENAI_API_KEY_OCR=${OPENAI_API_KEY_OCR:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+    networks:
+      - licitaverify-net
+
+  # ── Backend: Telegram Agent + MCP Server ──────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: licitaverify-backend
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:?error}
+      - DEEPSEEK_API_KEY_LLM=${DEEPSEEK_API_KEY_LLM:?error}
+      - ARKIV_RPC_URL=${ARKIV_RPC_URL:-https://rpc.braga.arkiv.network}
+      - ARKIV_EXPLORER_URL=${ARKIV_EXPLORER_URL:-https://data.arkiv.network}
+    networks:
+      - licitaverify-net
+    depends_on:
+      - frontend
+
+networks:
+  licitaverify-net:
+    driver: bridge

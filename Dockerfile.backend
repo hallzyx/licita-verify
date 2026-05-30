@@ -1,0 +1,31 @@
+# ── Backend: Agent (Node.js) + MCP Server (Python/uv) ──────────────────
+# El agent spawns el MCP server como subproceso via @ai-sdk/mcp stdio.
+# Por eso ambos runtimes van en la misma imagen.
+
+# ── Final image ─────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+# Install Python + uv for the MCP server
+RUN apk add --no-cache python3 py3-pip \
+    && pip3 install --break-system-packages uv \
+    && rm -rf /root/.cache/pip
+
+WORKDIR /app
+
+# ── MCP Server ──────────────────────────────────────────────────────────
+COPY arkiv-mcp/pyproject.toml arkiv-mcp/uv.lock arkiv-mcp/
+COPY arkiv-mcp/src/ ./arkiv-mcp/src/
+
+RUN cd arkiv-mcp && uv sync
+
+# ── Agent ───────────────────────────────────────────────────────────────
+# Incluimos devDeps porque el agent usa tsx como runtime runner
+COPY agent/package*.json ./agent/
+RUN cd agent && npm ci
+
+COPY agent/tsconfig.json ./agent/
+COPY agent/src/ ./agent/src/
+
+WORKDIR /app/agent
+
+CMD ["npm", "run", "agent"]

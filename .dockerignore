@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+.next/
+dist/
+out/
+build/
+.ruff_cache/
+
+# Environment (secrets only — .env.example is tracked)
+.env
+.env.local
+.env.production
+.env.development
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# AI tooling (not part of the app)
+.agents/
+.atl/
+skills-lock.json
