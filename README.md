@@ -4,6 +4,9 @@
 
 LicitaVerify es una plataforma que registra cada hito de una licitación pública en una bitácora inalterable y verificable, permitiendo que entidades, proveedores, auditores y la ciudadanía vean qué pasó, cuándo y quién hizo cada cambio.
 
+📺 **Pitch:** [youtube.com/watch?v=9bYCp1oG_NE](https://www.youtube.com/watch?v=9bYCp1oG_NE)
+🎥 **Demo:** [youtube.com/watch?v=HaGdi7J3W64](https://www.youtube.com/watch?v=HaGdi7J3W64)
+
 ---
 
 ## Track del Hackathon
