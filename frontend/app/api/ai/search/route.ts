@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPublicClient } from "@/lib/arkiv/client";
+import { getPublicClient, withRetry } from "@/lib/arkiv/client";
 import { eq, gte, lte } from "@arkiv-network/sdk/query";
 import { parseSearchQuery, type ArkivFilters } from "@/lib/ai-search";
 
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     // Note: keyword is omitted for MVP — Arkiv SDK does not support
     // free-text LIKE / CONTAINS on attributes.
 
-    const result = await arkivQuery.fetch();
+    const result = await withRetry(() => arkivQuery.fetch());
 
     const entities = result.entities.map((entity) => {
       let payload = null;

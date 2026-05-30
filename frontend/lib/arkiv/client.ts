@@ -11,6 +11,35 @@ function getEnvOrThrow(key: string): string {
 }
 
 /**
+ * Retry an async operation with backoff on transient Arkiv RPC errors.
+ * Catches "context cancelled" timeouts and retries up to `maxRetries` times.
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 2,
+  delayMs = 1500,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Arkiv node sometimes returns "context cancelled" on broad queries
+      if (msg.includes("context cancelled") || msg.includes("timeout")) {
+        lastError = e;
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+      }
+      throw e;
+    }
+  }
+  throw lastError;
+}
+
+/**
  * Server-only WalletClient for writing entities to Arkiv.
  * Uses the admin private key from env.
  */

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getPublicClient } from "@/lib/arkiv/client";
+import { getPublicClient, withRetry } from "@/lib/arkiv/client";
 import { eq, gte, lte } from "@arkiv-network/sdk/query";
 import {
   TIPOS_PROCEDIMIENTO,
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     }
     // keyword omitted for MVP — see ai/search route for rationale
 
-    const result = await query.fetch();
+    const result = await withRetry(() => query.fetch());
 
     const entities = result.entities.map((entity) => {
       let payload = null;

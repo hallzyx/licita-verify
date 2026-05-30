@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getPublicClient, PROJECT_ATTRIBUTE, getAdminAddress } from "@/lib/arkiv/client";
+import { getPublicClient, PROJECT_ATTRIBUTE, getAdminAddress, withRetry } from "@/lib/arkiv/client";
 import { eq } from "@arkiv-network/sdk/query";
 
 export async function GET(request: NextRequest) {
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       query.cursor(cursor);
     }
 
-    const result = await query.fetch();
+    const result = await withRetry(() => query.fetch());
 
     const entities = result.entities.map((entity) => {
       let payload = null;

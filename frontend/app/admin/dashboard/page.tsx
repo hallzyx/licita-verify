@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DashboardClient } from "./dashboard-client";
-import { getPublicClient, PROJECT_ATTRIBUTE, getAdminAddress } from "@/lib/arkiv/client";
+import { getPublicClient, PROJECT_ATTRIBUTE, getAdminAddress, withRetry } from "@/lib/arkiv/client";
 import { eq } from "@arkiv-network/sdk/query";
 
 export const dynamic = "force-dynamic";
@@ -23,15 +23,17 @@ export default async function DashboardPage() {
     const publicClient = getPublicClient();
     const adminAddress = getAdminAddress();
 
-    const result = await publicClient
-      .buildQuery()
-      .where(eq("project", PROJECT_ATTRIBUTE.value))
-      .where(eq("entityType", "pliego"))
-      .createdBy(adminAddress)
-      .withPayload(true)
-      .withAttributes(true)
-      .limit(50)
-      .fetch();
+    const result = await withRetry(() =>
+      publicClient
+        .buildQuery()
+        .where(eq("project", PROJECT_ATTRIBUTE.value))
+        .where(eq("entityType", "pliego"))
+        .createdBy(adminAddress)
+        .withPayload(true)
+        .withAttributes(true)
+        .limit(50)
+        .fetch()
+    );
 
     entities = result.entities.map((entity) => {
       let payload = null;
